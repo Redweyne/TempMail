@@ -1,0 +1,138 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Plus, Search, Mail } from "lucide-react";
+import { AliasList } from "@/components/alias-list";
+import { EmailList } from "@/components/email-list";
+import { EmailViewer } from "@/components/email-viewer";
+import { CreateAliasDialog } from "@/components/create-alias-dialog";
+import { EmptyState } from "@/components/empty-state";
+import type { Alias, Email } from "@shared/schema";
+
+export default function Dashboard() {
+  const [selectedAliasId, setSelectedAliasId] = useState<string | null>(null);
+  const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
+  // Fetch all aliases with real-time polling
+  const { data: aliases = [], isLoading: aliasesLoading } = useQuery<Alias[]>({
+    queryKey: ["/api/aliases"],
+    refetchInterval: 5000, // Poll every 5 seconds for new aliases
+  });
+
+  // Fetch emails for selected alias with real-time polling
+  const { data: emails = [], isLoading: emailsLoading } = useQuery<Email[]>({
+    queryKey: ["/api/aliases", selectedAliasId, "emails"],
+    enabled: !!selectedAliasId,
+    refetchInterval: selectedAliasId ? 3000 : false, // Poll every 3 seconds when alias is selected
+  });
+
+  // Filter aliases based on search
+  const filteredAliases = aliases.filter((alias) =>
+    alias.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const selectedAlias = aliases.find((a) => a.id === selectedAliasId);
+  const selectedEmail = emails.find((e) => e.id === selectedEmailId);
+
+  return (
+    <div className="flex h-screen flex-col">
+      {/* Top Navigation */}
+      <header className="h-16 border-b flex items-center justify-between px-6 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <Mail className="w-6 h-6 text-primary" />
+          <h1 className="text-xl font-bold">Redweyne</h1>
+        </div>
+        <Button 
+          onClick={() => setIsCreateDialogOpen(true)} 
+          data-testid="button-new-alias"
+          className="gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          New Alias
+        </Button>
+      </header>
+
+      {/* Main Content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Sidebar - Alias List */}
+        <aside className="w-80 border-r flex flex-col bg-card">
+          {/* Search */}
+          <div className="p-4 border-b">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search aliases..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-10"
+                data-testid="input-search-aliases"
+              />
+            </div>
+          </div>
+
+          {/* Alias List */}
+          <div className="flex-1 overflow-y-auto">
+            <AliasList
+              aliases={filteredAliases}
+              selectedId={selectedAliasId}
+              onSelect={setSelectedAliasId}
+              isLoading={aliasesLoading}
+            />
+          </div>
+
+          {/* Create Alias Button (bottom) */}
+          <div className="p-4 border-t">
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={() => setIsCreateDialogOpen(true)}
+              data-testid="button-create-alias-bottom"
+            >
+              <Plus className="w-4 h-4" />
+              Create New Alias
+            </Button>
+          </div>
+        </aside>
+
+        {/* Right Content - Email List or Viewer */}
+        <main className="flex-1 flex flex-col overflow-hidden bg-background">
+          {!selectedAliasId ? (
+            <EmptyState
+              icon={Mail}
+              title="Select an alias"
+              description="Choose an alias from the sidebar to view its emails, or create a new one to get started."
+              action={
+                <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-empty-create">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Your First Alias
+                </Button>
+              }
+            />
+          ) : selectedEmailId && selectedEmail ? (
+            <EmailViewer
+              email={selectedEmail}
+              onBack={() => setSelectedEmailId(null)}
+              alias={selectedAlias}
+            />
+          ) : (
+            <EmailList
+              emails={emails}
+              isLoading={emailsLoading}
+              onSelectEmail={setSelectedEmailId}
+              alias={selectedAlias}
+            />
+          )}
+        </main>
+      </div>
+
+      {/* Create Alias Dialog */}
+      <CreateAliasDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+      />
+    </div>
+  );
+}
