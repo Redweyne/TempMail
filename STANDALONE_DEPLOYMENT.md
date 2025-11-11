@@ -182,56 +182,21 @@ curl http://localhost:5001/tempmail/api/health
 nano /etc/nginx/sites-available/InboxAI
 ```
 
-**Add the tempmail location BEFORE the existing `location /` block:**
+**You will see your current configuration. Here's the COMPLETE file with the tempmail location added.**
 
-Find this section:
+**Replace your ENTIRE first server block with this:**
+
 ```nginx
 server {
-    listen 80;
-    listen 443 ssl http2;
     server_name redmeyne.com www.redmeyne.com;
 
-    # Your existing SSL settings
-    # ...
-```
-
-**Add this NEW location block right after the SSL settings and BEFORE `location /`:**
-```nginx
-    # Tempmail application
+    # NEW: Tempmail application - ADD THIS BLOCK
     location /tempmail {
-        proxy_pass http://localhost:5001;
+        proxy_pass http://127.0.0.1:5001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
+        proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 300s;
-        client_max_body_size 10M;
-    }
-```
-
-**Your final config should look like this:**
-```nginx
-server {
-    listen 80;
-    listen 443 ssl http2;
-    server_name redmeyne.com www.redmeyne.com;
-
-    # Your existing SSL settings
-    ssl_certificate /etc/letsencrypt/live/redmeyne.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/redmeyne.com/privkey.pem;
-    
-    # Tempmail application (NEW)
-    location /tempmail {
-        proxy_pass http://localhost:5001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -239,20 +204,44 @@ server {
         client_max_body_size 10M;
     }
 
-    # InboxAI application (existing)
+    # EXISTING: InboxAI application - KEEP THIS
     location / {
-        proxy_pass http://localhost:5000;
+        proxy_pass http://127.0.0.1:5000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
+        proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
+
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/redmeyne.com/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/redmeyne.com/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparams /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+}
+
+server {
+    if ($host = www.redmeyne.com) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+    if ($host = redmeyne.com) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+    listen 80;
+    server_name redmeyne.com www.redmeyne.com;
+    return 404; # managed by Certbot
 }
 ```
+
+**What changed:**
+- Added the `/tempmail` location block BEFORE the existing `/` location
+- Used `127.0.0.1:5001` (same format as your existing config)
+- Everything else stays exactly the same
 
 **Save:** `Ctrl+X`, `Y`, `Enter`
 
