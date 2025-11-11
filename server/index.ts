@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
@@ -6,6 +7,9 @@ const app = express();
 
 // Trust proxy for proper IP detection behind Replit's proxy
 app.set('trust proxy', true);
+
+// Normalize BASE_PATH from environment (defaults to "/" for local dev)
+const basePath = (process.env.BASE_PATH || "/").replace(/\/$/, "") || "/";
 
 declare module 'http' {
   interface IncomingMessage {
@@ -32,8 +36,13 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+    // Strip base path from logging to see clean /api/* paths
+    const cleanPath = basePath !== "/" && path.startsWith(basePath) 
+      ? path.slice(basePath.length) || "/"
+      : path;
+    
+    if (cleanPath.startsWith("/api")) {
+      let logLine = `${req.method} ${cleanPath} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
@@ -50,9 +59,13 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = await registerRoutes(app);
+  // Create a scoped app that will be mounted under basePath
+  const scopedApp = express();
+  
+  // Register routes on the scoped app
+  await registerRoutes(scopedApp);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  scopedApp.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
@@ -63,11 +76,16 @@ app.use((req, res, next) => {
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
+  const server = createServer(app);
+  
   if (app.get("env") === "development") {
-    await setupVite(app, server);
+    await setupVite(scopedApp, server);
   } else {
-    serveStatic(app);
+    serveStatic(scopedApp);
   }
+
+  // Mount the scoped app under basePath on the root app
+  app.use(basePath, scopedApp);
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
@@ -79,6 +97,6 @@ app.use((req, res, next) => {
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
-    log(`serving on port ${port}`);
+    log(`serving on port ${port}${basePath !== "/" ? ` with base path: ${basePath}` : ""}`);
   });
 })();

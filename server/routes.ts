@@ -1,6 +1,5 @@
 import type { Express } from "express";
 import express from "express";
-import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { parseEmail, sendEmail } from "./email-utils";
 import { insertAliasSchema, sendEmailSchema } from "@shared/schema";
@@ -9,7 +8,7 @@ import helmet from "helmet";
 import cors from "cors";
 import morgan from "morgan";
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export async function registerRoutes(app: Express): Promise<void> {
   // Security middleware
   app.use(helmet({
     contentSecurityPolicy: app.get("env") === "development" ? false : undefined,
@@ -271,8 +270,4 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
-
-  const httpServer = createServer(app);
-
-  return httpServer;
 }
