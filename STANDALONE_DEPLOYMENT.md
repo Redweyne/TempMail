@@ -1,458 +1,692 @@
-# Standalone Deployment Guide: Tempmail Service
+# Complete Deployment Guide - Tempmail to Contabo VPS
 
-Deploy the Redweyne temporary email service at `redweyne.com/tempmail` as a **completely separate application** from your existing redweyne.com site.
-
----
-
-## Prerequisites
-
-- Your VPS running Linux
-- Node.js 18+ installed
-- PM2 installed globally (`npm install -g pm2`)
-- Git installed
-- A reverse proxy (Nginx, Apache, Caddy, etc.) already serving your main site
-- Cloudflare account with Email Workers set up
+**Your Configuration:**
+- VPS IP: `149.102.143.10`
+- Domain: `redweyne.com` (IONOS)
+- App Name: `Tempmail`
+- App URL: `https://redweyne.com/tempmail`
+- Database: SQLite
 
 ---
 
-## Part 1: Deploy the Application
+## 📋 PREREQUISITES
 
-### Step 1: Create Dedicated Directory
+Before starting, have these ready:
+- ✅ Contabo VPS credentials (IP: 149.102.143.10, root password)
+- ✅ IONOS domain (redweyne.com) already configured
+- ✅ Nginx already installed (from InboxAI setup)
+- ✅ PM2 already installed (from InboxAI setup)
+- ✅ SendGrid account for email sending
+- ✅ Cloudflare account with Email Routing enabled
+- ✅ 30 minutes of time
+
+---
+
+## 🚀 STEP-BY-STEP DEPLOYMENT
+
+### Step 1: Connect to Your VPS
+
+**Using SSH:**
+```bash
+ssh root@149.102.143.10
+```
+Enter your root password when prompted.
+
+---
+
+### Step 2: Create Application Directory
 
 ```bash
-# SSH into your VPS
-ssh your-user@your-vps
-
-# Create a dedicated directory for tempmail
-sudo mkdir -p /var/www/tempmail
-sudo chown -R $USER:$USER /var/www/tempmail
+# Create dedicated directory for tempmail
+mkdir -p /var/www/tempmail
 cd /var/www/tempmail
 ```
 
-### Step 2: Clone and Install
+---
 
+### Step 3: Upload Your Application Code
+
+**Option A: Using Git (if you pushed to GitHub)**
 ```bash
-# Clone your repository
-git clone <your-repo-url> .
-
-# Install dependencies
-npm install --production
+cd /var/www/tempmail
+git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git .
 ```
 
-### Step 3: Build with Base Path
+**Option B: Upload from Replit**
+1. On Replit: Download your project as ZIP
+2. Use SFTP (FileZilla) to upload to `/var/www/tempmail`
+3. Or use `scp` from your local machine:
+   ```bash
+   scp -r /path/to/tempmail root@149.102.143.10:/var/www/tempmail/
+   ```
 
-**CRITICAL:** The app must be built with the base path set.
-
-Use the provided build script:
-
+**After upload, install dependencies:**
 ```bash
-chmod +x build-subpath.sh
-./build-subpath.sh /tempmail
+cd /var/www/tempmail
+npm install
 ```
 
-This creates a `dist/` folder with your built application.
+⏱️ Wait 2-3 minutes for installation
 
-### Step 4: Configure Environment
+---
 
-Create a `.env` file in `/var/www/tempmail`:
+### Step 4: Get SendGrid API Key
+
+1. Go to [SendGrid](https://sendgrid.com/)
+2. Log in or create account
+3. Click **Settings** → **API Keys** (in left sidebar)
+4. Click **Create API Key**
+5. Name: **Tempmail Service**
+6. API Key Permissions: **Full Access** (or Restricted with Mail Send enabled)
+7. Click **Create & View**
+8. **Copy the API key** (starts with `SG.`)
+9. Save it - you won't see it again!
+
+---
+
+### Step 5: Create Environment File
 
 ```bash
-cat > .env << 'EOF'
+cd /var/www/tempmail
+nano .env
+```
+
+**Paste this (with YOUR actual values):**
+```env
 NODE_ENV=production
 PORT=5001
 BASE_PATH=/tempmail
 
-# Generate with: openssl rand -hex 32
-INBOUND_SHARED_SECRET=your_generated_secret_here
+# Generate secret with: openssl rand -hex 32
+INBOUND_SHARED_SECRET=CHANGE_THIS_TO_A_RANDOM_SECRET
 
-# Your SendGrid API key
-SMTP_PASS=your_sendgrid_api_key_here
-EOF
+# Your SendGrid API key (from Step 4)
+SMTP_PASS=SG.XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ```
 
-**Generate the secret:**
-```bash
-openssl rand -hex 32
-# Copy the output and paste it into .env
-```
+**Generate the INBOUND_SHARED_SECRET:**
+1. Press `Ctrl + Z` to pause nano
+2. Run: `openssl rand -hex 32`
+3. Copy the output
+4. Type `fg` to return to nano
+5. Paste the secret where it says `CHANGE_THIS_TO_A_RANDOM_SECRET`
 
-### Step 5: Set Up PM2 Process
+**Save the file:**
+- Press `Ctrl + X`
+- Press `Y`
+- Press `Enter`
 
-Create PM2 config at `/var/www/tempmail/ecosystem.config.js`:
+---
 
-```javascript
-module.exports = {
-  apps: [{
-    name: 'tempmail',
-    script: './dist/index.js',
-    cwd: '/var/www/tempmail',
-    instances: 2,
-    exec_mode: 'cluster',
-    env_production: {
-      NODE_ENV: 'production',
-      PORT: 5001,
-      BASE_PATH: '/tempmail'
-    },
-    error_file: '/var/www/tempmail/logs/err.log',
-    out_file: '/var/www/tempmail/logs/out.log',
-    log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-    merge_logs: true
-  }]
-};
-```
+### Step 6: Build the Application
 
-Create logs directory:
-```bash
-mkdir -p /var/www/tempmail/logs
-```
-
-Start the application:
 ```bash
 cd /var/www/tempmail
-pm2 start ecosystem.config.js --env production
+
+# Make build script executable
+chmod +x build-subpath.sh
+
+# Build with the /tempmail base path
+./build-subpath.sh /tempmail
+```
+
+⏱️ Wait 1-2 minutes for build to complete
+
+---
+
+### Step 7: Start Application with PM2
+
+```bash
+cd /var/www/tempmail
+
+# Create logs directory
+mkdir -p logs
+
+# Start the application
+pm2 start dist/index.js --name "tempmail" --env production
+
+# Save PM2 configuration
 pm2 save
-pm2 startup  # Follow the command it gives you
-```
 
-Verify it's running:
-```bash
+# Check status
 pm2 status
-pm2 logs tempmail
+```
 
-# Test locally
+**You should see:**
+```
+┌──────────┬────┬─────────┬──────┬───────┐
+│ Name     │ id │ status  │ cpu  │ mem   │
+├──────────┼────┼─────────┼──────┼───────┤
+│ InboxAI  │ 0  │ online  │ 0%   │ 50MB  │
+│ tempmail │ 1  │ online  │ 0%   │ 30MB  │
+└──────────┴────┴─────────┴──────┴───────┘
+```
+
+**View logs:**
+```bash
+pm2 logs tempmail --lines 20
+```
+
+**Test locally:**
+```bash
 curl http://localhost:5001/tempmail/api/health
+# Should return: {"status":"ok"}
 ```
 
 ---
 
-## Part 2: Configure Your Reverse Proxy
+### Step 8: Configure Nginx for Subpath
 
-Your app is now running on `localhost:5001` with BASE_PATH `/tempmail`. You need to configure your existing reverse proxy to route `redweyne.com/tempmail` to this service.
-
-### First: Identify Your Web Server
-
-Run these commands to see what you're using:
-
+**Open your existing Nginx configuration:**
 ```bash
-# Check what's installed
-which nginx
-which apache2
-which httpd
-which caddy
-
-# Check what's running
-systemctl list-units --type=service | grep -E 'nginx|apache|httpd|caddy'
-
-# Check listening ports
-sudo ss -tulpn | grep :80
-sudo ss -tulpn | grep :443
+nano /etc/nginx/sites-available/InboxAI
 ```
 
----
+**Add the tempmail location BEFORE the existing `location /` block:**
 
-### Option A: Nginx Configuration
-
-Find your config file:
-```bash
-# Common locations:
-ls /etc/nginx/sites-available/
-ls /etc/nginx/conf.d/
-```
-
-Edit your existing site config (e.g., `/etc/nginx/sites-available/redweyne`):
-
+Find this section:
 ```nginx
 server {
     listen 80;
     listen 443 ssl http2;
-    server_name redweyne.com;
+    server_name redmeyne.com www.redmeyne.com;
 
-    # SSL configuration (your existing SSL settings)
+    # Your existing SSL settings
     # ...
+```
 
-    # NEW: Tempmail application
+**Add this NEW location block right after the SSL settings and BEFORE `location /`:**
+```nginx
+    # Tempmail application
     location /tempmail {
         proxy_pass http://localhost:5001;
         proxy_http_version 1.1;
-        
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+        client_max_body_size 10M;
+    }
+```
+
+**Your final config should look like this:**
+```nginx
+server {
+    listen 80;
+    listen 443 ssl http2;
+    server_name redmeyne.com www.redmeyne.com;
+
+    # Your existing SSL settings
+    ssl_certificate /etc/letsencrypt/live/redmeyne.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/redmeyne.com/privkey.pem;
+    
+    # Tempmail application (NEW)
+    location /tempmail {
+        proxy_pass http://localhost:5001;
+        proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
-        
+        proxy_set_header Host $host;
         proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 300s;
         client_max_body_size 10M;
     }
 
-    # Your existing location / block for your main app
+    # InboxAI application (existing)
     location / {
-        # Your existing main app configuration
-        proxy_pass http://localhost:3000;  # Or wherever your main app is
-        # ...
+        proxy_pass http://localhost:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
 
-Test and reload:
+**Save:** `Ctrl+X`, `Y`, `Enter`
+
+**Test and reload Nginx:**
 ```bash
-sudo nginx -t
-sudo systemctl reload nginx
+# Test configuration
+nginx -t
+
+# Should say: syntax is ok, test is successful
+
+# Reload Nginx
+systemctl reload nginx
 ```
 
 ---
 
-### Option B: Apache Configuration
+### Step 9: Configure Cloudflare Email Worker
 
-Find your config:
+#### 9.1 Set Up Email Routing in Cloudflare
+
+1. Log in to [Cloudflare Dashboard](https://dash.cloudflare.com/)
+2. Select your domain (e.g., `redweyne.com`)
+3. Go to **Email** → **Email Routing** (in left sidebar)
+4. Click **Get started**
+5. **Destination address:** Enter your personal email
+6. Click **Enable Email Routing**
+7. **Important:** Copy the MX records shown and add them to IONOS
+
+#### 9.2 Add MX Records in IONOS
+
+1. Log in to [IONOS](https://www.ionos.com/)
+2. Go to **Domains & SSL**
+3. Click on **redweyne.com**
+4. Click **DNS** or **Manage DNS Settings**
+5. Add the MX records from Cloudflare (usually 3 records):
+   - Type: `MX`, Host: `@`, Points to: `route1.mx.cloudflare.net`, Priority: `89`
+   - Type: `MX`, Host: `@`, Points to: `route2.mx.cloudflare.net`, Priority: `17`
+   - Type: `MX`, Host: `@`, Points to: `route3.mx.cloudflare.net`, Priority: `56`
+6. Add TXT record for verification (copy from Cloudflare)
+7. Click **Save**
+
+⏱️ Wait 5-10 minutes for DNS propagation
+
+#### 9.3 Install Cloudflare Wrangler
+
+**On your VPS:**
 ```bash
-# Common locations:
-ls /etc/apache2/sites-available/
-ls /etc/httpd/conf.d/
+npm install -g wrangler
+
+# Login to Cloudflare
+wrangler login
+# This will open a browser - authorize the connection
 ```
 
-Enable required modules:
-```bash
-sudo a2enmod proxy proxy_http headers rewrite
-sudo systemctl restart apache2
-```
-
-Add to your VirtualHost (e.g., `/etc/apache2/sites-available/redweyne.conf`):
-
-```apache
-<VirtualHost *:80>
-<VirtualHost *:443>
-    ServerName redweyne.com
-    
-    # Your existing SSL settings
-    # ...
-
-    # NEW: Tempmail application
-    ProxyPreserveHost On
-    ProxyPass /tempmail http://localhost:5001/tempmail
-    ProxyPassReverse /tempmail http://localhost:5001/tempmail
-    
-    RequestHeader set X-Forwarded-Proto "https" env=HTTPS
-    RequestHeader set X-Forwarded-Prefix "/tempmail"
-
-    # Your existing main app proxy
-    ProxyPass / http://localhost:3000/
-    ProxyPassReverse / http://localhost:3000/
-</VirtualHost>
-```
-
-Test and reload:
-```bash
-sudo apachectl configtest
-sudo systemctl reload apache2
-```
-
----
-
-### Option C: Caddy Configuration
-
-Find your Caddyfile:
-```bash
-# Common locations:
-ls /etc/caddy/Caddyfile
-ls ~/Caddyfile
-```
-
-Edit the Caddyfile:
-
-```caddy
-redweyne.com {
-    # NEW: Tempmail application
-    handle /tempmail* {
-        reverse_proxy localhost:5001
-    }
-
-    # Your existing main app
-    handle {
-        reverse_proxy localhost:3000
-    }
-}
-```
-
-Reload:
-```bash
-sudo systemctl reload caddy
-```
-
----
-
-### Option D: Other Reverse Proxies / CDN
-
-If you're using:
-- **Cloudflare Workers / Pages**: Add a Worker route for `/tempmail/*` → `http://your-vps-ip:5001`
-- **AWS ALB / API Gateway**: Add a path-based routing rule
-- **Traefik**: Add a router with PathPrefix(`/tempmail`)
-
-**General principles:**
-1. Route requests to `/tempmail` → `http://localhost:5001`
-2. Preserve the `/tempmail` prefix in the URL
-3. Set headers: `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host`
-
----
-
-## Part 3: Configure Cloudflare Email Worker
-
-Update your Cloudflare Email Worker to send to the new webhook URL:
+#### 9.4 Deploy Email Worker
 
 ```bash
-cd /path/to/your/cloudflare-email-worker
+cd /var/www/tempmail/cloudflare-email-worker
 
 # Set the webhook URL
 wrangler secret put WEBHOOK_URL
-# Enter: https://redweyne.com/tempmail/api/inbound
+# When prompted, enter: https://redweyne.com/tempmail/api/inbound
 
-# Set the shared secret (must match your .env INBOUND_SHARED_SECRET)
+# Set the shared secret (use the SAME secret from your .env file)
 wrangler secret put WEBHOOK_SECRET
-# Enter: (paste the same secret from your .env file)
+# When prompted, paste the INBOUND_SHARED_SECRET from your .env file
 
-# Deploy
+# Deploy the worker
 wrangler deploy
+```
+
+**You should see:**
+```
+✨ Success! Uploaded worker
+Published worker (0.XX sec)
+  https://cloudflare-email-worker.YOUR-ACCOUNT.workers.dev
+```
+
+#### 9.5 Configure Email Routing Rules
+
+1. Back in Cloudflare Dashboard: **Email** → **Email Routing**
+2. Go to **Routes** tab
+3. Click **Create route** or **Edit** default route
+4. **Matcher:** Custom addresses: `*@redweyne.com`
+5. **Action:** Send to a Worker → Select your deployed worker
+6. Click **Save**
+
+---
+
+## 🎉 TESTING YOUR DEPLOYMENT
+
+### Test 1: Check Application Status
+```bash
+pm2 status
+pm2 logs tempmail --lines 30
+```
+
+### Test 2: Access Your Site
+Open browser: `https://redweyne.com/tempmail`
+
+You should see the Tempmail landing page!
+
+### Test 3: Test Creating an Alias
+1. Click **"Get Started"**
+2. Click **"Create New Alias"**
+3. Enter a custom name (e.g., `test`)
+4. Select TTL (e.g., 30 minutes)
+5. Click **"Create"**
+6. You should see the alias created (e.g., `test@redweyne.com`)
+
+### Test 4: Test Receiving Emails
+1. Copy your alias address (e.g., `test@redweyne.com`)
+2. Send a test email to that address from your Gmail/personal email
+3. Wait 10-30 seconds
+4. Refresh the dashboard - the email should appear!
+5. Click on the email to view it
+6. Test marking as read, deleting
+
+### Test 5: Test API Endpoints
+```bash
+# Health check
+curl https://redweyne.com/tempmail/api/health
+
+# List aliases
+curl https://redweyne.com/tempmail/api/aliases
+
+# All should return valid JSON
 ```
 
 ---
 
-## Part 4: Verify Deployment
+## 🔧 COMMON ISSUES & FIXES
 
-### Test Frontend
+### Issue 1: 404 Not Found on /tempmail
+
+**Fix:**
 ```bash
-curl https://redweyne.com/tempmail
-# Should return HTML
+# Make sure Nginx config is correct
+nano /etc/nginx/sites-available/InboxAI
+# Verify the /tempmail location block exists BEFORE location /
 
-curl -I https://redweyne.com/tempmail
+# Test Nginx
+nginx -t
+
+# Reload Nginx
+systemctl reload nginx
+```
+
+### Issue 2: Application Not Running
+
+**Fix:**
+```bash
+# Check PM2 status
+pm2 status
+
+# If stopped, restart
+pm2 restart tempmail
+
+# View error logs
+pm2 logs tempmail --err --lines 50
+```
+
+### Issue 3: Build Failed
+
+**Fix:**
+```bash
+cd /var/www/tempmail
+
+# Make sure all dependencies are installed
+npm install
+
+# Try building again
+./build-subpath.sh /tempmail
+
+# If build script fails, check it's executable
+chmod +x build-subpath.sh
+```
+
+### Issue 4: Emails Not Arriving
+
+**Check these:**
+1. Cloudflare Email Routing is enabled
+2. MX records are set correctly in IONOS
+3. Email Worker is deployed and running
+4. Webhook URL is correct: `https://redweyne.com/tempmail/api/inbound`
+5. Shared secret matches in both .env and Cloudflare
+
+**Test webhook directly:**
+```bash
+# Get your shared secret
+cd /var/www/tempmail
+cat .env | grep INBOUND_SHARED_SECRET
+
+# Test webhook (replace YOUR_SECRET with actual secret)
+curl -X POST https://redweyne.com/tempmail/api/inbound \
+  -H "Content-Type: application/json" \
+  -H "X-Shared-Secret: YOUR_SECRET" \
+  -d '{"to":"test@redweyne.com","from":"sender@example.com","subject":"Test","text":"Test message"}'
+
 # Should return 200 OK
 ```
 
-### Test API
+**Check worker logs:**
 ```bash
-curl https://redweyne.com/tempmail/api/health
-# Should return {"status":"ok"}
-
-curl https://redweyne.com/tempmail/api/aliases
-# Should return []
+cd /var/www/tempmail/cloudflare-email-worker
+wrangler tail
+# Send a test email and watch the logs
 ```
 
-### Test in Browser
-1. Visit `https://redweyne.com/tempmail`
-2. Click "Get Started" → should go to `/tempmail/dashboard`
-3. Create an alias with custom name
-4. Send a test email to the generated address
-5. Verify email appears in the dashboard
-6. Test viewing, marking as read, deleting
+### Issue 5: CSS/JS Not Loading
 
-### Check Logs
+**Fix:**
+```bash
+cd /var/www/tempmail
+
+# Rebuild with correct base path
+./build-subpath.sh /tempmail
+
+# Restart app
+pm2 restart tempmail
+
+# Clear browser cache and refresh
+```
+
+### Issue 6: SendGrid Emails Not Sending
+
+**Check:**
+1. SendGrid API key is correct in .env
+2. SendGrid account is verified
+3. Check application logs for SendGrid errors
+
+**Fix:**
+```bash
+# Verify .env has correct key
+cd /var/www/tempmail
+cat .env | grep SMTP_PASS
+
+# View logs for errors
+pm2 logs tempmail --lines 100 | grep -i sendgrid
+```
+
+---
+
+## 📊 MAINTENANCE COMMANDS
+
+### View Logs
 ```bash
 # Application logs
 pm2 logs tempmail
 
-# Web server logs
-sudo tail -f /var/log/nginx/access.log  # Nginx
-sudo tail -f /var/log/apache2/access.log  # Apache
-sudo journalctl -u caddy -f  # Caddy
+# Last 50 lines
+pm2 logs tempmail --lines 50
+
+# Error logs only
+pm2 logs tempmail --err
+
+# Nginx logs
+tail -f /var/log/nginx/access.log | grep tempmail
+tail -f /var/log/nginx/error.log
 ```
 
----
-
-## Your Final Setup
-
-```
-/var/www/tempmail/              ← Dedicated directory
-├── dist/                       ← Built application
-│   ├── index.js               ← Express server
-│   └── public/                ← React frontend
-├── .env                       ← Environment variables
-├── ecosystem.config.js        ← PM2 configuration
-├── logs/                      ← Application logs
-├── emails.db                 ← SQLite database
-└── package.json
-
-Process: PM2 app "tempmail" on port 5001
-Reverse Proxy: Routes /tempmail → localhost:5001
-Database: SQLite at /var/www/tempmail/emails.db
+### Restart Application
+```bash
+pm2 restart tempmail
 ```
 
-**Completely separate from your main application!**
-
----
-
-## Maintenance
+### Stop Application
+```bash
+pm2 stop tempmail
+```
 
 ### Update Application
 ```bash
 cd /var/www/tempmail
-git pull origin main
-
-# Reinstall dependencies to ensure all build tools are available
-npm install --production
-
-# Rebuild with the base path
+git pull  # If using Git
+npm install
 ./build-subpath.sh /tempmail
-
-# Reload the application
-pm2 reload tempmail
-```
-
-### View Logs
-```bash
-pm2 logs tempmail
-# Or
-tail -f /var/www/tempmail/logs/out.log
-```
-
-### Backup Database
-```bash
-cp /var/www/tempmail/emails.db /var/www/tempmail/backups/emails-$(date +%Y%m%d).db
-```
-
-### Stop/Start
-```bash
-pm2 stop tempmail
-pm2 start tempmail
 pm2 restart tempmail
-pm2 delete tempmail  # Remove completely
+```
+
+### Database Backup
+```bash
+# SQLite database backup
+cp /var/www/tempmail/emails.db /root/tempmail-backup-$(date +%Y%m%d).db
+
+# Restore from backup
+cp /root/tempmail-backup-20250111.db /var/www/tempmail/emails.db
+pm2 restart tempmail
+```
+
+### Monitor Resources
+```bash
+# PM2 monitoring
+pm2 monit
+
+# Check disk space (SQLite database grows over time)
+du -sh /var/www/tempmail/emails.db
+```
+
+### Clean Old Emails (if database gets too large)
+```bash
+# The app auto-deletes expired aliases and their emails
+# But you can manually clean if needed
+
+# Stop app
+pm2 stop tempmail
+
+# Backup first!
+cp /var/www/tempmail/emails.db /root/backup.db
+
+# Delete old data (SQLite)
+sqlite3 /var/www/tempmail/emails.db
+# In SQLite shell:
+DELETE FROM emails WHERE receivedAt < datetime('now', '-7 days');
+VACUUM;
+.quit
+
+# Restart
+pm2 start tempmail
 ```
 
 ---
 
-## Troubleshooting
+## 📝 YOUR CONFIGURATION SUMMARY
 
-**502 Bad Gateway**
+**VPS Details:**
+- IP: `149.102.143.10`
+- OS: Ubuntu 24.04
+- Provider: Contabo
+
+**Domain:**
+- Domain: `redweyne.com`
+- Provider: IONOS
+- DNS: Pointing to `149.102.143.10`
+
+**Application:**
+- Name: `Tempmail`
+- Location: `/var/www/tempmail`
+- URL: `https://redweyne.com/tempmail`
+- Port: `5001`
+- Process Manager: PM2
+
+**Database:**
+- Type: SQLite
+- Location: `/var/www/tempmail/emails.db`
+
+**Email Services:**
+- Email Routing: Cloudflare
+- Email Sending: SendGrid SMTP
+- Worker: Cloudflare Email Worker
+
+**URLs:**
+- Frontend: `https://redweyne.com/tempmail`
+- Dashboard: `https://redweyne.com/tempmail/dashboard`
+- API: `https://redweyne.com/tempmail/api/*`
+- Webhook: `https://redweyne.com/tempmail/api/inbound`
+
+**Running Apps on VPS:**
+- InboxAI: `https://redweyne.com` (port 5000)
+- Tempmail: `https://redweyne.com/tempmail` (port 5001)
+
+---
+
+## ✅ DEPLOYMENT CHECKLIST
+
+- [ ] Connected to VPS (149.102.143.10)
+- [ ] Created directory /var/www/tempmail
+- [ ] Uploaded application code
+- [ ] Ran npm install
+- [ ] Got SendGrid API key
+- [ ] Created .env file with all credentials
+- [ ] Generated INBOUND_SHARED_SECRET
+- [ ] Built application with ./build-subpath.sh /tempmail
+- [ ] Started application with PM2
+- [ ] Configured Nginx location /tempmail block
+- [ ] Tested and reloaded Nginx
+- [ ] Set up Cloudflare Email Routing
+- [ ] Added MX records in IONOS
+- [ ] Installed Wrangler on VPS
+- [ ] Deployed Cloudflare Email Worker
+- [ ] Set WEBHOOK_URL in worker
+- [ ] Set WEBHOOK_SECRET in worker
+- [ ] Configured Email Routing rules
+- [ ] Tested frontend access
+- [ ] Created test alias
+- [ ] Sent test email
+- [ ] Verified email received
+
+---
+
+## 🎯 QUICK TROUBLESHOOTING
+
+**Application won't start:**
 ```bash
-# Check if app is running
-pm2 status tempmail
-pm2 logs tempmail
+pm2 logs tempmail --err --lines 50
+cd /var/www/tempmail
+node dist/index.js  # Run directly to see errors
+```
 
-# Restart if needed
+**404 on /tempmail:**
+```bash
+nginx -t  # Test Nginx config
+systemctl reload nginx
+pm2 logs tempmail
+```
+
+**Emails not arriving:**
+```bash
+# Check Cloudflare worker
+cd /var/www/tempmail/cloudflare-email-worker
+wrangler tail
+
+# Test webhook
+curl -X POST https://redweyne.com/tempmail/api/inbound \
+  -H "X-Shared-Secret: YOUR_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"to":"test@redweyne.com","from":"test@gmail.com","subject":"Test","text":"Hello"}'
+```
+
+**Database issues:**
+```bash
+# Check database file exists
+ls -lh /var/www/tempmail/emails.db
+
+# Check permissions
+chmod 644 /var/www/tempmail/emails.db
 pm2 restart tempmail
 ```
 
-**404 on frontend routes**
+---
+
+**Your Tempmail service is now live at: https://redweyne.com/tempmail** 🎉
+
+For support, check the logs first:
 ```bash
-# Ensure you built with the correct base path
-cd /var/www/tempmail
-./build-subpath.sh /tempmail
-pm2 reload tempmail
-```
-
-**API calls failing**
-- Check browser console - API URLs should be `/tempmail/api/...`
-- Verify `BASE_PATH=/tempmail` in your `.env` file
-- Verify reverse proxy is passing requests correctly
-
-**Emails not arriving**
-```bash
-# Check webhook URL in Cloudflare Worker
-wrangler secret list
-
-# Test webhook directly
-curl -X POST https://redweyne.com/tempmail/api/inbound \
-  -H "Content-Type: application/json" \
-  -H "X-Shared-Secret: your_secret" \
-  -d '{"to":"test@redweyne.com","from":"sender@example.com","subject":"Test","text":"Test"}'
+pm2 logs tempmail --lines 100
 ```
