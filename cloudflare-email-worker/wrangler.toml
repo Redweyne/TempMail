@@ -1,0 +1,7 @@
+name = "redweyne-email-worker"
+main = "index.js"
+compatibility_date = "2025-01-01"
+
+# Secrets to configure via Wrangler CLI:
+# wrangler secret put WEBHOOK_URL
+# wrangler secret put INBOUND_SHARED_SECRET
