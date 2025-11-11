@@ -49,7 +49,16 @@ cd /var/www/tempmail
 **Option A: Using Git (if you pushed to GitHub)**
 ```bash
 cd /var/www/tempmail
+
+# IMPORTANT: Note the dot (.) at the end - it clones INTO current directory
 git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git .
+
+# Verify package.json exists in current directory
+ls -la package.json
+# You should see: package.json
+
+# Install dependencies
+npm install
 ```
 
 **Option B: Upload from Replit**

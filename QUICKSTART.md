@@ -25,7 +25,14 @@ ssh your-user@your-vps
 sudo mkdir -p /var/www/tempmail
 sudo chown -R $USER:$USER /var/www/tempmail
 cd /var/www/tempmail
+
+# IMPORTANT: The dot (.) at the end clones INTO the current directory
 git clone <your-repo-url> .
+
+# Verify package.json is in the current directory
+ls package.json
+
+# Install dependencies
 npm install --production
 ```
 
