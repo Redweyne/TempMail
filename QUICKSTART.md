@@ -32,7 +32,8 @@ npm install --production
 ### 2. Build Application (2 min)
 
 ```bash
-BASE_PATH=/tempmail/ npm run build
+chmod +x build-subpath.sh
+./build-subpath.sh /tempmail
 ```
 
 ### 3. Configure Environment (3 min)
@@ -231,9 +232,10 @@ pm2 logs tempmail    # Any errors?
 
 **"404 Not Found"**
 ```bash
-# Did you build with BASE_PATH?
+# Did you build with the correct base path?
 cd /var/www/tempmail
-BASE_PATH=/tempmail/ npm run build
+npm install --production  # Ensure dependencies are installed
+./build-subpath.sh /tempmail
 pm2 reload tempmail
 ```
 

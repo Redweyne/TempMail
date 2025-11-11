@@ -41,13 +41,9 @@ npm install --production
 
 ### Step 3: Build with Base Path
 
-**CRITICAL:** The app must be built with the base path set:
+**CRITICAL:** The app must be built with the base path set.
 
-```bash
-BASE_PATH=/tempmail/ npm run build
-```
-
-Or use the helper script:
+Use the provided build script:
 
 ```bash
 chmod +x build-subpath.sh
@@ -391,8 +387,14 @@ Database: SQLite at /var/www/tempmail/emails.db
 ```bash
 cd /var/www/tempmail
 git pull origin main
+
+# Reinstall dependencies to ensure all build tools are available
 npm install --production
-BASE_PATH=/tempmail/ npm run build
+
+# Rebuild with the base path
+./build-subpath.sh /tempmail
+
+# Reload the application
 pm2 reload tempmail
 ```
 
@@ -432,9 +434,9 @@ pm2 restart tempmail
 
 **404 on frontend routes**
 ```bash
-# Ensure you built with BASE_PATH
+# Ensure you built with the correct base path
 cd /var/www/tempmail
-BASE_PATH=/tempmail/ npm run build
+./build-subpath.sh /tempmail
 pm2 reload tempmail
 ```
 

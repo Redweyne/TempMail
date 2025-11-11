@@ -7,11 +7,22 @@ SUBPATH=${1:-/tempmail}
 echo "Building application for subpath: $SUBPATH"
 echo "============================================"
 
-# Export BASE_PATH for vite to use
-export BASE_PATH=$SUBPATH
+# Ensure we have node_modules
+if [ ! -d "node_modules" ]; then
+  echo "Error: node_modules not found. Please run 'npm install' first."
+  exit 1
+fi
 
-# Build the application
-npm run build
+# Add local node_modules/.bin to PATH
+export PATH="$(pwd)/node_modules/.bin:$PATH"
+
+# Build the client with Vite using --base flag
+echo "Building frontend..."
+vite build --base="$SUBPATH/"
+
+# Build the server with esbuild
+echo "Building backend..."
+esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
 
 echo ""
 echo "✅ Build complete!"

@@ -12,7 +12,7 @@ import morgan from "morgan";
 export async function registerRoutes(app: Express): Promise<Server> {
   // Security middleware
   app.use(helmet({
-    contentSecurityPolicy: false, // disable for development
+    contentSecurityPolicy: app.get("env") === "development" ? false : undefined,
   }));
   app.use(cors());
   app.use(morgan("combined"));
@@ -31,6 +31,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Apply rate limiting to API routes
   app.use("/api", apiLimiter);
+
+  // GET /api/health - Health check endpoint
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok" });
+  });
 
   // GET /api/aliases - Get all aliases
   app.get("/api/aliases", (req, res) => {
