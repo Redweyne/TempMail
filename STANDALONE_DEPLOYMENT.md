@@ -142,8 +142,8 @@ cd /var/www/tempmail
 # Create logs directory
 mkdir -p logs
 
-# Start the application
-pm2 start dist/index.js --name "tempmail" --env production
+# Start the application using ecosystem config
+pm2 start ecosystem.config.js --env production
 
 # Save PM2 configuration
 pm2 save
@@ -188,7 +188,7 @@ nano /etc/nginx/sites-available/InboxAI
 
 ```nginx
 server {
-    server_name redmeyne.com www.redmeyne.com;
+    server_name redweyne.com www.redweyne.com;
 
     # NEW: Tempmail application - ADD THIS BLOCK
     location /tempmail {
@@ -217,23 +217,23 @@ server {
     }
 
     listen 443 ssl; # managed by Certbot
-    ssl_certificate /etc/letsencrypt/live/redmeyne.com/fullchain.pem; # managed by Certbot
-    ssl_certificate_key /etc/letsencrypt/live/redmeyne.com/privkey.pem; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/redweyne.com/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/redweyne.com/privkey.pem; # managed by Certbot
     include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
     ssl_dhparams /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
 }
 
 server {
-    if ($host = www.redmeyne.com) {
+    if ($host = www.redweyne.com) {
         return 301 https://$host$request_uri;
     } # managed by Certbot
 
-    if ($host = redmeyne.com) {
+    if ($host = redweyne.com) {
         return 301 https://$host$request_uri;
     } # managed by Certbot
 
     listen 80;
-    server_name redmeyne.com www.redmeyne.com;
+    server_name redweyne.com www.redweyne.com;
     return 404; # managed by Certbot
 }
 ```
@@ -437,9 +437,13 @@ cat .env | grep INBOUND_SHARED_SECRET
 
 # Test webhook (replace YOUR_SECRET with actual secret)
 curl -X POST https://redweyne.com/tempmail/api/inbound \
-  -H "Content-Type: application/json" \
-  -H "X-Shared-Secret: YOUR_SECRET" \
-  -d '{"to":"test@redweyne.com","from":"sender@example.com","subject":"Test","text":"Test message"}'
+  -H "Content-Type: text/plain" \
+  -H "X-Inbound-Secret: YOUR_SECRET" \
+  -d 'Subject: Test
+From: sender@example.com
+To: test@redweyne.com
+
+Test message body'
 
 # Should return 200 OK
 ```
@@ -656,9 +660,13 @@ wrangler tail
 
 # Test webhook
 curl -X POST https://redweyne.com/tempmail/api/inbound \
-  -H "X-Shared-Secret: YOUR_SECRET" \
-  -H "Content-Type: application/json" \
-  -d '{"to":"test@redweyne.com","from":"test@gmail.com","subject":"Test","text":"Hello"}'
+  -H "X-Inbound-Secret: YOUR_SECRET" \
+  -H "Content-Type: text/plain" \
+  -d 'Subject: Test
+From: test@gmail.com
+To: test@redweyne.com
+
+Hello from webhook test'
 ```
 
 **Database issues:**
