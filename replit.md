@@ -6,7 +6,9 @@ Redweyne is a temporary email service that allows users to create disposable ema
 
 ## User Preferences
 
-Preferred communication style: Simple, everyday language.
+- Communication style: Simple, everyday language
+- Deployment target: VPS at redweyne.com/tempmail (standalone, separate from main site)
+- No assumptions: User doesn't use Nginx - provide web-server agnostic guidance
 
 ## System Architecture
 
@@ -114,3 +116,26 @@ Preferred communication style: Simple, everyday language.
 **Font Services**
 - Google Fonts API for Inter and JetBrains Mono font families
 - Preconnect optimization for fonts.googleapis.com and fonts.gstatic.com
+
+### Deployment Strategy
+
+**Subpath Deployment Support**
+- Built-in support for deployment at any base path (e.g., `/tempmail`)
+- `BASE_PATH` environment variable configures routing and API calls
+- Build-time configuration via `BASE_URL` environment variable
+- Centralized base path utilities in `client/src/lib/basePath.ts`
+
+**Production Deployment Model**
+- Target: Standalone application at `redweyne.com/tempmail`
+- Directory structure: `/var/www/tempmail/` (completely separate from main site)
+- Process manager: PM2 with dedicated process named "tempmail" on port 5001
+- Reverse proxy: Routes `/tempmail` requests to localhost:5001
+- Database: Separate SQLite file in application directory
+- No dependencies on main redweyne.com application
+
+**Deployment Files**
+- `STANDALONE_DEPLOYMENT.md`: Comprehensive deployment guide (web-server agnostic)
+- `QUICKSTART.md`: 30-minute quick deploy guide
+- `ecosystem.config.js`: PM2 process configuration
+- `.env.production.example`: Production environment template
+- `build-subpath.sh`: Helper script for building with base path
