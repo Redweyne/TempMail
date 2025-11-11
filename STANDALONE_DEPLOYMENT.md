@@ -7,6 +7,8 @@
 - App URL: `https://redweyne.com/tempmail`
 - Database: SQLite
 
+> **⚠️ IMPORTANT:** The Cloudflare Worker environment variable MUST be named `INBOUND_SHARED_SECRET` (NOT `WEBHOOK_SECRET`). This variable name must match exactly in both the worker code and Cloudflare Worker settings.
+
 ---
 
 ## 📋 PREREQUISITES
@@ -286,7 +288,7 @@ export default {
   async email(message, env, ctx) {
     try {
       const webhookUrl = env.WEBHOOK_URL;
-      const sharedSecret = env.WEBHOOK_SECRET;
+      const sharedSecret = env.INBOUND_SHARED_SECRET;
 
       if (!webhookUrl) {
         console.error('WEBHOOK_URL not configured');
@@ -337,7 +339,7 @@ export default {
 
 **Variable 2:**
 - Click **"Add variable"** again
-- Variable name: `WEBHOOK_SECRET`
+- Variable name: `INBOUND_SHARED_SECRET`
 - Value: (paste the SAME value as `INBOUND_SHARED_SECRET` from your .env file on the server)
 - Click **"Encrypt"** checkbox? **YES** (check it)
 - Click **"Add variable"**
