@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Mail, Clock, Send, Shield, Zap, Trash2 } from "lucide-react";
 import heroImage from "@assets/generated_images/Hero_inbox_illustration_purple_4415092b.png";
+import { withBasePath } from "@/lib/basePath";
 
 export default function Landing() {
   return (
@@ -21,7 +22,7 @@ export default function Landing() {
                 Create disposable email addresses instantly. Protect your privacy, avoid spam, and keep your inbox clean with auto-expiring aliases.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                <Link href="/dashboard">
+                <Link href={withBasePath("/dashboard")}>
                   <Button size="lg" className="text-base px-8" data-testid="button-get-started">
                     Get Started Free
                   </Button>
@@ -179,7 +180,7 @@ export default function Landing() {
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
             Create your first temporary email address now. No signup required.
           </p>
-          <Link href="/dashboard">
+          <Link href={withBasePath("/dashboard")}>
             <Button size="lg" className="text-base px-12" data-testid="button-cta-dashboard">
               Go to Dashboard
             </Button>

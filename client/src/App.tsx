@@ -6,12 +6,15 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import NotFound from "@/pages/not-found";
+import { getBasePath } from "@/lib/basePath";
+
+const BASE = getBasePath();
 
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Landing} />
-      <Route path="/dashboard" component={Dashboard} />
+      <Route path={BASE || "/"} component={Landing} />
+      <Route path={`${BASE}/dashboard`} component={Dashboard} />
       <Route component={NotFound} />
     </Switch>
   );
