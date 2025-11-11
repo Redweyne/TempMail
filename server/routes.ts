@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { parseEmail, sendEmail } from "./email-utils";
@@ -143,7 +144,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/inbound - Receive inbound emails from Cloudflare Worker
-  app.post("/api/inbound", inboundLimiter, async (req, res) => {
+  // Use text parser for raw email data
+  app.post("/api/inbound", 
+    express.text({ type: 'text/plain', limit: '10mb' }),
+    inboundLimiter, 
+    async (req, res) => {
     try {
       // Verify shared secret
       const inboundSecret = req.headers["x-inbound-secret"];
@@ -159,10 +164,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      // Parse raw email
+      // Get raw email - it comes as text body from Cloudflare Worker
       const rawEmail = req.body;
 
-      if (!rawEmail || !Buffer.isBuffer(rawEmail)) {
+      if (!rawEmail || typeof rawEmail !== 'string') {
         return res.status(400).json({ message: "Invalid email data" });
       }
 
@@ -197,7 +202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subject: parsed.subject,
         bodyText: parsed.bodyText,
         bodyHtml: parsed.bodyHtml,
-        raw: rawEmail.toString("base64"), // store as base64
+        raw: Buffer.from(rawEmail).toString("base64"), // store as base64
       });
 
       console.log(`Email received for ${recipientEmail}: ${parsed.subject}`);

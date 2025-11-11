@@ -12,9 +12,19 @@ export async function parseEmail(rawEmail: Buffer | string): Promise<{
 }> {
   const parsed = await simpleParser(rawEmail);
 
+  // Handle from address (can be AddressObject or AddressObject[])
+  const fromAddress = Array.isArray(parsed.from) 
+    ? parsed.from[0]?.text 
+    : parsed.from?.text;
+  
+  // Handle to address (can be AddressObject or AddressObject[])
+  const toAddress = Array.isArray(parsed.to) 
+    ? parsed.to[0]?.text 
+    : parsed.to?.text;
+
   return {
-    from: parsed.from?.text || "unknown@sender.com",
-    to: parsed.to?.text || "",
+    from: fromAddress || "unknown@sender.com",
+    to: toAddress || "",
     subject: parsed.subject || "(No subject)",
     bodyText: parsed.text || null,
     bodyHtml: parsed.html ? String(parsed.html) : null,

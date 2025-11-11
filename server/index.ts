@@ -4,6 +4,9 @@ import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 
+// Trust proxy for proper IP detection behind Replit's proxy
+app.set('trust proxy', true);
+
 declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown
