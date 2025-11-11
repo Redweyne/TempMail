@@ -269,74 +269,110 @@ systemctl reload nginx
 
 ### Step 9: Configure Cloudflare Email Worker
 
-#### 9.1 Set Up Email Routing in Cloudflare
+#### 9.1 Create Email Worker in Cloudflare
 
 1. Log in to [Cloudflare Dashboard](https://dash.cloudflare.com/)
+2. Click **"Workers & Pages"** in left sidebar
+3. Click **"Create application"**
+4. Click **"Create Worker"**
+5. **Worker name:** Change to `tempmail-receiver`
+6. **Select starter:** Choose **"Create my own"** (last option)
+7. Click **"Deploy"**
+8. Click **"Edit code"** button
+9. **Delete all existing code** and paste this:
+
+```javascript
+export default {
+  async email(message, env, ctx) {
+    try {
+      const webhookUrl = env.WEBHOOK_URL;
+      const sharedSecret = env.WEBHOOK_SECRET;
+
+      if (!webhookUrl) {
+        console.error('WEBHOOK_URL not configured');
+        return new Response('Configuration error', { status: 500 });
+      }
+
+      const rawEmail = await new Response(message.raw).text();
+
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain',
+          'X-Inbound-Secret': sharedSecret || '',
+        },
+        body: rawEmail,
+      });
+
+      if (!response.ok) {
+        console.error('Webhook delivery failed:', response.status, await response.text());
+        return new Response('Webhook delivery failed', { status: 500 });
+      }
+
+      console.log(`Email forwarded successfully from ${message.from} to ${message.to}`);
+      return new Response('Email processed', { status: 200 });
+
+    } catch (error) {
+      console.error('Error processing email:', error);
+      return new Response('Processing error: ' + error.message, { status: 500 });
+    }
+  }
+};
+```
+
+10. Click **"Save and deploy"**
+
+#### 9.2 Add Environment Variables to Worker
+
+1. Still in the Worker page, click **"Settings"** tab
+2. Click **"Variables"** in left menu
+3. Under **"Environment Variables"**, click **"Add variable"**
+4. Add these TWO variables:
+
+**Variable 1:**
+- Variable name: `WEBHOOK_URL`
+- Value: `https://redweyne.com/tempmail/api/inbound`
+- Click **"Encrypt"** checkbox? **NO** (leave unchecked)
+- Click **"Add variable"**
+
+**Variable 2:**
+- Click **"Add variable"** again
+- Variable name: `WEBHOOK_SECRET`
+- Value: (paste the SAME value as `INBOUND_SHARED_SECRET` from your .env file on the server)
+- Click **"Encrypt"** checkbox? **YES** (check it)
+- Click **"Add variable"**
+
+5. Click **"Save and deploy"** at the bottom
+
+#### 9.3 Set Up Email Routing in Cloudflare
+
+1. Go back to Cloudflare main menu
 2. Select your domain (e.g., `redweyne.com`)
 3. Go to **Email** → **Email Routing** (in left sidebar)
-4. Click **Get started**
-5. **Destination address:** Enter your personal email
-6. Click **Enable Email Routing**
-7. **Important:** Copy the MX records shown and add them to IONOS
+4. If asked "Get started", click **"Skip getting started"**
+5. Click **"Routing rules"** tab
+6. Click **"Create address"** or **"Catch-all address"**
+7. Select **"Catch-all address"**
+8. Action: Select **"Send to a Worker"**
+9. Worker: Select **"tempmail-receiver"** (your worker)
+10. Click **"Save"**
 
-#### 9.2 Add MX Records in IONOS
+#### 9.4 Add MX Records in IONOS (or your DNS provider)
+
+Cloudflare will show you MX records to add. You need to add these to IONOS (or your DNS provider):
 
 1. Log in to [IONOS](https://www.ionos.com/)
 2. Go to **Domains & SSL**
 3. Click on **redweyne.com**
 4. Click **DNS** or **Manage DNS Settings**
-5. Add the MX records from Cloudflare (usually 3 records):
+5. Add the MX records shown by Cloudflare (usually 3 records like):
    - Type: `MX`, Host: `@`, Points to: `route1.mx.cloudflare.net`, Priority: `89`
    - Type: `MX`, Host: `@`, Points to: `route2.mx.cloudflare.net`, Priority: `17`
    - Type: `MX`, Host: `@`, Points to: `route3.mx.cloudflare.net`, Priority: `56`
-6. Add TXT record for verification (copy from Cloudflare)
+6. Add TXT record for verification if shown by Cloudflare
 7. Click **Save**
 
-⏱️ Wait 5-10 minutes for DNS propagation
-
-#### 9.3 Install Cloudflare Wrangler
-
-**On your VPS:**
-```bash
-npm install -g wrangler
-
-# Login to Cloudflare
-wrangler login
-# This will open a browser - authorize the connection
-```
-
-#### 9.4 Deploy Email Worker
-
-```bash
-cd /var/www/tempmail/cloudflare-email-worker
-
-# Set the webhook URL
-wrangler secret put WEBHOOK_URL
-# When prompted, enter: https://redweyne.com/tempmail/api/inbound
-
-# Set the shared secret (use the SAME secret from your .env file)
-wrangler secret put WEBHOOK_SECRET
-# When prompted, paste the INBOUND_SHARED_SECRET from your .env file
-
-# Deploy the worker
-wrangler deploy
-```
-
-**You should see:**
-```
-✨ Success! Uploaded worker
-Published worker (0.XX sec)
-  https://cloudflare-email-worker.YOUR-ACCOUNT.workers.dev
-```
-
-#### 9.5 Configure Email Routing Rules
-
-1. Back in Cloudflare Dashboard: **Email** → **Email Routing**
-2. Go to **Routes** tab
-3. Click **Create route** or **Edit** default route
-4. **Matcher:** Custom addresses: `*@redweyne.com`
-5. **Action:** Send to a Worker → Select your deployed worker
-6. Click **Save**
+⏱️ Wait 5-10 minutes for DNS propagation, then Cloudflare will verify automatically
 
 ---
 
