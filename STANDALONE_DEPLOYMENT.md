@@ -373,12 +373,12 @@ sudo journalctl -u caddy -f  # Caddy
 ├── .env                       ← Environment variables
 ├── ecosystem.config.js        ← PM2 configuration
 ├── logs/                      ← Application logs
-├── redweyne.db               ← SQLite database
+├── emails.db                 ← SQLite database
 └── package.json
 
 Process: PM2 app "tempmail" on port 5001
 Reverse Proxy: Routes /tempmail → localhost:5001
-Database: SQLite at /var/www/tempmail/redweyne.db
+Database: SQLite at /var/www/tempmail/emails.db
 ```
 
 **Completely separate from your main application!**
@@ -405,7 +405,7 @@ tail -f /var/www/tempmail/logs/out.log
 
 ### Backup Database
 ```bash
-cp /var/www/tempmail/redweyne.db /var/www/tempmail/backups/redweyne-$(date +%Y%m%d).db
+cp /var/www/tempmail/emails.db /var/www/tempmail/backups/emails-$(date +%Y%m%d).db
 ```
 
 ### Stop/Start

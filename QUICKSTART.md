@@ -216,7 +216,7 @@ Tempmail:     redweyne.com/tempmail  → New service (port 5001)
 
 Directory:    /var/www/tempmail/     → Completely separate
 PM2 Process:  "tempmail"             → Separate process
-Database:     /var/www/tempmail/redweyne.db → Separate database
+Database:     /var/www/tempmail/emails.db → Separate database
 ```
 
 ---
