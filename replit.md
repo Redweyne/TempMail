@@ -136,6 +136,6 @@ Redweyne is a temporary email service that allows users to create disposable ema
 **Deployment Files**
 - `STANDALONE_DEPLOYMENT.md`: Comprehensive deployment guide (web-server agnostic)
 - `QUICKSTART.md`: 30-minute quick deploy guide
-- `ecosystem.config.js`: PM2 process configuration
+- `ecosystem.config.cjs`: PM2 process configuration
 - `.env.production.example`: Production environment template
 - `build-subpath.sh`: Helper script for building with base path

@@ -152,7 +152,7 @@ cd /var/www/tempmail
 mkdir -p logs
 
 # Start the application using ecosystem config
-pm2 start ecosystem.config.js --env production
+pm2 start ecosystem.config.cjs --env production
 
 # Save PM2 configuration
 pm2 save
