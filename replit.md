@@ -13,13 +13,13 @@ Redweyne is a temporary email service that allows users to create disposable ema
 ## Recent Changes
 
 ### November 12, 2025 - Critical VPS Deployment Fix: ESM Loader & Trust Proxy
-- **Fixed ESM module loading error**: Converted loader from CommonJS (.cjs) to ES Module (.mjs) for proper ES module compatibility
+- **Fixed ESM module loading error**: Converted loader from CommonJS to ES Module format while keeping the filename as `loader.js` for PM2 compatibility
 - **Fixed trust proxy bypass vulnerability**: Trust proxy now ONLY enabled in Replit environment (when REPL_ID exists), disabled on VPS
 - **Production build compatibility**: Loader is now a pure ES module that properly loads the esbuild output
 - **Security improvement**: Eliminates IP-based rate limiting bypass on VPS deployments
 - **What changed**: 
-  - Renamed `loader.cjs` → `loader.mjs` and converted to ES module syntax
-  - Updated `ecosystem.config.cjs` to point to `loader.mjs`
+  - Converted `loader.cjs` → `loader.js` with ES module syntax (PM2 caches script paths, so keeping the same filename avoids recreation)
+  - Updated `ecosystem.config.cjs` to point to `./loader.js`
   - Removed trust proxy on VPS to prevent security warnings and rate limit bypass
 - **VPS Deployment Steps**:
   ```bash
@@ -28,6 +28,7 @@ Redweyne is a temporary email service that allows users to create disposable ema
   npm run build
   pm2 restart tempmail
   ```
+- **Note**: PM2 caches the script path when a process starts. Renaming the entry script requires either keeping the same filename or running `pm2 delete tempmail && pm2 start ecosystem.config.cjs`
 
 ### November 12, 2025 - Permanent Email Support & Cleanup Features
 - **Added permanent email aliases**: Users can now create permanent email addresses that never expire alongside temporary ones

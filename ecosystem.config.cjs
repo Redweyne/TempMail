@@ -1,7 +1,7 @@
 module.exports = {
   apps: [{
     name: 'tempmail',
-    script: './loader.mjs',
+    script: './loader.js',
     cwd: '/var/www/tempmail',
     instances: 1,
     exec_mode: 'fork',
