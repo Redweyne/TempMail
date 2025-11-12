@@ -5,8 +5,8 @@ import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 
-// Always trust proxy when behind reverse proxy (Nginx/Replit)
-app.set('trust proxy', true);
+// Trust proxy from Nginx on localhost (1 hop)
+app.set('trust proxy', 1);
 
 // Normalize BASE_PATH from environment (defaults to "/" for local dev)
 const basePath = (process.env.BASE_PATH || "/").replace(/\/$/, "") || "/";
