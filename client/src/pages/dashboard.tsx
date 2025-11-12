@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Mail } from "lucide-react";
+import { Plus, Search, Mail, Trash2 } from "lucide-react";
 import { AliasList } from "@/components/alias-list";
 import { EmailList } from "@/components/email-list";
 import { EmailViewer } from "@/components/email-viewer";
 import { CreateAliasDialog } from "@/components/create-alias-dialog";
 import { EmptyState } from "@/components/empty-state";
+import { useToast } from "@/hooks/use-toast";
 import type { Alias, Email } from "@shared/schema";
 
 export default function Dashboard() {
@@ -17,6 +18,8 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"temporary" | "permanent">("temporary");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Fetch all aliases with real-time polling
   const { data: aliases = [], isLoading: aliasesLoading } = useQuery<Alias[]>({
@@ -41,6 +44,33 @@ export default function Dashboard() {
   const selectedAlias = aliases.find((a) => a.id === selectedAliasId);
   const selectedEmail = emails.find((e) => e.id === selectedEmailId);
 
+  // Cleanup expired aliases mutation
+  const cleanupMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/cleanup", {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to cleanup expired items");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/aliases"] });
+      toast({
+        title: "Cleanup completed",
+        description: `Deleted ${data.deletedAliases} expired aliases and ${data.deletedEmails} emails`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Cleanup failed",
+        description: "Could not delete expired items. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   return (
     <div className="flex h-screen flex-col">
       {/* Top Navigation */}
@@ -49,14 +79,26 @@ export default function Dashboard() {
           <Mail className="w-6 h-6 text-primary" />
           <h1 className="text-xl font-bold">Redweyne</h1>
         </div>
-        <Button 
-          onClick={() => setIsCreateDialogOpen(true)} 
-          data-testid="button-new-alias"
-          className="gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          New Alias
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={() => cleanupMutation.mutate()}
+            variant="outline"
+            className="gap-2"
+            disabled={cleanupMutation.isPending}
+            data-testid="button-cleanup"
+          >
+            <Trash2 className="w-4 h-4" />
+            {cleanupMutation.isPending ? "Cleaning..." : "Clean Expired"}
+          </Button>
+          <Button 
+            onClick={() => setIsCreateDialogOpen(true)} 
+            data-testid="button-new-alias"
+            className="gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            New Alias
+          </Button>
+        </div>
       </header>
 
       {/* Main Content */}

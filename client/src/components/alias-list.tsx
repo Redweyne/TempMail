@@ -28,7 +28,14 @@ function AliasCard({ alias, isSelected, onClick }: { alias: Alias; isSelected: b
   const unreadCount = emails.filter((e) => !e.read).length;
 
   useEffect(() => {
+    // For permanent aliases, show "Permanent" instead of time left
+    if (alias.isPermanent || !alias.expiresAt) {
+      setTimeLeft("Permanent");
+      return;
+    }
+
     const updateTimer = () => {
+      if (!alias.expiresAt) return;
       const now = new Date();
       const expires = new Date(alias.expiresAt);
       const diff = expires.getTime() - now.getTime();
@@ -55,7 +62,7 @@ function AliasCard({ alias, isSelected, onClick }: { alias: Alias; isSelected: b
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [alias.expiresAt]);
+  }, [alias.expiresAt, alias.isPermanent]);
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -65,6 +72,7 @@ function AliasCard({ alias, isSelected, onClick }: { alias: Alias; isSelected: b
   };
 
   const isExpiringSoon = () => {
+    if (alias.isPermanent || !alias.expiresAt) return false;
     const now = new Date();
     const expires = new Date(alias.expiresAt);
     const diff = expires.getTime() - now.getTime();
