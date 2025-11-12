@@ -109,6 +109,26 @@ export class SqliteStorage implements IStorage {
     `);
   }
 
+  // Generate natural-looking email prefix
+  private generateNaturalPrefix(): string {
+    const consonants = 'bcdfghjklmnpqrstvwxyz';
+    const vowels = 'aeiou';
+    
+    let username = '';
+    const length = Math.floor(Math.random() * 3) + 6;
+    
+    for (let i = 0; i < length; i++) {
+      if (i % 2 === 0) {
+        username += consonants[Math.floor(Math.random() * consonants.length)];
+      } else {
+        username += vowels[Math.floor(Math.random() * vowels.length)];
+      }
+    }
+    
+    const randomNum = Math.floor(Math.random() * 999);
+    return `${username}${randomNum}`;
+  }
+
   // Alias methods
   createAlias(data: InsertAlias): Alias {
     const id = randomUUID();
@@ -116,8 +136,7 @@ export class SqliteStorage implements IStorage {
 
     // Auto-generate prefix if not provided
     if (!prefix) {
-      const prefixType = data.isPermanent ? 'perm' : 'temp';
-      prefix = `${prefixType}-${randomUUID().slice(0, 8)}`;
+      prefix = this.generateNaturalPrefix();
     }
 
     const email = `${prefix}@redweyne.com`;
