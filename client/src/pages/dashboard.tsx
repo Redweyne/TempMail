@@ -48,12 +48,17 @@ export default function Dashboard() {
   const cleanupMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch("/api/cleanup", {
+        method: "GET",
         credentials: "include",
       });
       if (!response.ok) {
         throw new Error("Failed to cleanup expired items");
       }
-      return response.json();
+      return response.json() as Promise<{
+        message: string;
+        deletedAliases: number;
+        deletedEmails: number;
+      }>;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/aliases"] });

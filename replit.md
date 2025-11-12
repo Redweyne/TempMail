@@ -17,15 +17,19 @@ Redweyne is a temporary email service that allows users to create disposable ema
 - **Database schema update**: Added `isPermanent` boolean field to aliases table, made `expiresAt` nullable for permanent aliases
 - **Automatic database migration**: Existing databases automatically upgrade to support the new schema on server restart
 - **Cleanup mechanism enhancement**: Cleanup routines now only delete temporary (non-permanent) aliases and their emails
+- **Manual cleanup button**: Added "Clean Expired" button in dashboard header to manually trigger cleanup of expired temporary aliases and emails
 - **UI improvements**: 
   - Added tabs in dashboard to separate temporary and permanent email aliases
   - Create dialog adapts based on selected tab (shows/hides TTL selector)
   - Automatic prefix generation distinguishes between 'temp-' and 'perm-' prefixes
+  - Permanent aliases display "Permanent" instead of countdown timer
+  - Fixed timer handling for permanent aliases to prevent TypeScript errors
 - **Backend updates**:
   - Inbound email handler properly handles permanent aliases (no expiration check)
   - Storage layer filters cleanup operations to only affect temporary aliases
   - API maintains backward compatibility while supporting new features
 - **VPS compatibility**: All changes designed to work seamlessly with existing VPS deployments (push to GitHub, pull on VPS, restart)
+- **Development note**: Replit dev banner only appears in development mode (when NODE_ENV !== "production"). Production builds for VPS deployment do not include the banner.
 
 ## System Architecture
 
