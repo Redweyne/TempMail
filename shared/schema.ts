@@ -25,6 +25,35 @@ export const insertAliasSchema = z.object({
   {
     message: "ttlMinutes must be a valid integer",
   }
+).refine(
+  (data) => {
+    // Reject prefixes that are exactly or start/end with obvious disposable keywords
+    if (!data.prefix) return true; // Skip validation for auto-generated
+    
+    const blockedPatterns = [
+      /^temp[-_.]/, /[-_.]temp$/, /^temp\d/, // temp at start with separator/number
+      /^disposable/i, /^throwaway/i, /^trash/i, /^fake/i,
+      /^junk/i, /^spam/i, /^burner/i, /^anonymous/i,
+      /^test\d/, /^demo\d/, /^sample\d/, // test/demo/sample followed by numbers
+    ];
+    
+    const lowerPrefix = data.prefix.toLowerCase();
+    return !blockedPatterns.some(pattern => pattern.test(lowerPrefix));
+  },
+  {
+    message: "Email prefix cannot start or end with disposable email indicators",
+  }
+).refine(
+  (data) => {
+    // Ensure prefix follows RFC standards (alphanumeric, dots, underscores, hyphens)
+    if (!data.prefix) return true; // Skip validation for auto-generated
+    
+    const validPrefixPattern = /^[a-zA-Z0-9._-]+$/;
+    return validPrefixPattern.test(data.prefix);
+  },
+  {
+    message: "Email prefix can only contain letters, numbers, dots, underscores, and hyphens",
+  }
 );
 
 export type InsertAlias = z.infer<typeof insertAliasSchema>;

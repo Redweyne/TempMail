@@ -109,24 +109,128 @@ export class SqliteStorage implements IStorage {
     `);
   }
 
-  // Generate natural-looking email prefix
+  // Generate natural-looking email prefix using multiple strategies
   private generateNaturalPrefix(): string {
-    const consonants = 'bcdfghjklmnpqrstvwxyz';
+    const strategies = [
+      this.generateCommonNameStyle.bind(this),
+      this.generateWordNumberStyle.bind(this),
+      this.generatePronounceable.bind(this),
+      this.generateProfessionalStyle.bind(this),
+    ];
+    
+    // Randomly select a strategy
+    const strategy = strategies[Math.floor(Math.random() * strategies.length)];
+    return strategy();
+  }
+
+  // Strategy 1: Common name patterns (firstname.lastname, firstname_lastname)
+  private generateCommonNameStyle(): string {
+    const firstNames = [
+      'james', 'john', 'robert', 'michael', 'david', 'william', 'richard', 'joseph',
+      'thomas', 'charles', 'mary', 'patricia', 'jennifer', 'linda', 'barbara',
+      'elizabeth', 'susan', 'jessica', 'sarah', 'karen', 'emily', 'ashley', 'sophia',
+      'olivia', 'emma', 'daniel', 'matthew', 'anthony', 'mark', 'paul', 'steven',
+      'andrew', 'joshua', 'kevin', 'brian', 'george', 'edward', 'ronald', 'timothy',
+      'jason', 'jeffrey', 'ryan', 'jacob', 'gary', 'nicholas', 'eric', 'jonathan'
+    ];
+    
+    const lastNames = [
+      'smith', 'johnson', 'williams', 'brown', 'jones', 'garcia', 'miller', 'davis',
+      'rodriguez', 'martinez', 'hernandez', 'lopez', 'gonzalez', 'wilson', 'anderson',
+      'thomas', 'taylor', 'moore', 'jackson', 'martin', 'lee', 'perez', 'thompson',
+      'white', 'harris', 'sanchez', 'clark', 'ramirez', 'lewis', 'robinson', 'walker',
+      'young', 'allen', 'king', 'wright', 'scott', 'torres', 'nguyen', 'hill', 'flores'
+    ];
+    
+    const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+    const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+    
+    const separators = ['.', '_', ''];
+    const separator = separators[Math.floor(Math.random() * separators.length)];
+    
+    // Sometimes add birth year or random 2-digit number
+    const addNumber = Math.random() > 0.4;
+    const number = addNumber ? (Math.floor(Math.random() * 99) + 1970).toString().slice(-2) : '';
+    
+    return `${firstName}${separator}${lastName}${number}`;
+  }
+
+  // Strategy 2: Single word + numbers (common username style)
+  private generateWordNumberStyle(): string {
+    const words = [
+      'phoenix', 'dragon', 'eagle', 'wolf', 'tiger', 'falcon', 'hawk', 'bear',
+      'lion', 'panther', 'cobra', 'viper', 'shadow', 'storm', 'thunder', 'lightning',
+      'blaze', 'flame', 'frost', 'nova', 'star', 'cosmic', 'lunar', 'solar',
+      'ocean', 'river', 'forest', 'mountain', 'valley', 'horizon', 'zenith',
+      'alpha', 'beta', 'gamma', 'delta', 'omega', 'nexus', 'apex', 'prime',
+      'cyber', 'digital', 'pixel', 'byte', 'turbo', 'nitro', 'ultra', 'mega',
+      'royal', 'noble', 'knight', 'sage', 'wizard', 'mystic', 'phantom', 'ghost'
+    ];
+    
+    const word = words[Math.floor(Math.random() * words.length)];
+    
+    // Vary number patterns: 2-4 digits
+    const numberLength = Math.floor(Math.random() * 3) + 2; // 2-4 digits
+    let number = '';
+    for (let i = 0; i < numberLength; i++) {
+      number += Math.floor(Math.random() * 10);
+    }
+    
+    return `${word}${number}`;
+  }
+
+  // Strategy 3: Pronounceable combinations (looks human-typed)
+  private generatePronounceable(): string {
+    const consonants = 'bcdfghjklmnprstvwxz';
     const vowels = 'aeiou';
     
     let username = '';
-    const length = Math.floor(Math.random() * 3) + 6;
+    const syllables = Math.floor(Math.random() * 2) + 2; // 2-3 syllables
     
-    for (let i = 0; i < length; i++) {
-      if (i % 2 === 0) {
+    for (let i = 0; i < syllables; i++) {
+      // Consonant + Vowel pattern
+      username += consonants[Math.floor(Math.random() * consonants.length)];
+      username += vowels[Math.floor(Math.random() * vowels.length)];
+      
+      // Sometimes add another consonant
+      if (Math.random() > 0.5) {
         username += consonants[Math.floor(Math.random() * consonants.length)];
-      } else {
-        username += vowels[Math.floor(Math.random() * vowels.length)];
       }
     }
     
-    const randomNum = Math.floor(Math.random() * 999);
-    return `${username}${randomNum}`;
+    // Add 1-3 digit number
+    const num = Math.floor(Math.random() * 999) + 1;
+    return `${username}${num}`;
+  }
+
+  // Strategy 4: Professional-looking (initial + lastname style)
+  private generateProfessionalStyle(): string {
+    const initials = 'abcdefghijklmnopqrstuvwxyz';
+    const surnames = [
+      'anderson', 'baker', 'carter', 'davies', 'edwards', 'fisher', 'green', 'hughes',
+      'jenkins', 'kelly', 'lawrence', 'morgan', 'nelson', 'owens', 'parker', 'quinn',
+      'roberts', 'stevens', 'turner', 'vaughan', 'watson', 'young', 'bennett', 'cooper'
+    ];
+    
+    const initial = initials[Math.floor(Math.random() * initials.length)];
+    const surname = surnames[Math.floor(Math.random() * surnames.length)];
+    
+    // Formats: j.anderson, janderson, anderson.j, andersonj
+    const formats = [
+      `${initial}.${surname}`,
+      `${initial}${surname}`,
+      `${surname}.${initial}`,
+      `${surname}${initial}`
+    ];
+    
+    let result = formats[Math.floor(Math.random() * formats.length)];
+    
+    // Sometimes add 2-digit number
+    if (Math.random() > 0.6) {
+      result += Math.floor(Math.random() * 90) + 10;
+    }
+    
+    return result;
   }
 
   // Alias methods
@@ -134,9 +238,23 @@ export class SqliteStorage implements IStorage {
     const id = randomUUID();
     let prefix = data.prefix;
 
-    // Auto-generate prefix if not provided
+    // Auto-generate prefix with collision handling
     if (!prefix) {
-      prefix = this.generateNaturalPrefix();
+      const maxRetries = 10;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        prefix = this.generateNaturalPrefix();
+        const testEmail = `${prefix}@redweyne.com`;
+        
+        // Check if email already exists
+        const existing = this.getAliasByEmail(testEmail);
+        if (!existing) {
+          break; // Found unique prefix
+        }
+        
+        if (attempt === maxRetries - 1) {
+          throw new Error("Failed to generate unique email prefix after multiple attempts");
+        }
+      }
     }
 
     const email = `${prefix}@redweyne.com`;
@@ -151,7 +269,15 @@ export class SqliteStorage implements IStorage {
       VALUES (?, ?, ?, ?, ?, ?)
     `);
 
-    stmt.run(id, email, prefix, createdAt, expiresAt, isPermanent);
+    try {
+      stmt.run(id, email, prefix, createdAt, expiresAt, isPermanent);
+    } catch (error: any) {
+      // Handle UNIQUE constraint violation
+      if (error.message?.includes("UNIQUE constraint failed")) {
+        throw new Error("This email prefix is already in use. Please try another one.");
+      }
+      throw error;
+    }
 
     const inserted = this.getAliasById(id);
     if (!inserted) {
