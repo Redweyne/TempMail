@@ -16,6 +16,9 @@ fi
 # Add local node_modules/.bin to PATH
 export PATH="$(pwd)/node_modules/.bin:$PATH"
 
+# CRITICAL: Set NODE_ENV to production to exclude Replit branding
+export NODE_ENV=production
+
 # Build the client with Vite using --base flag
 echo "Building frontend..."
 vite build --base="$SUBPATH/"
