@@ -28,8 +28,14 @@ export async function registerRoutes(app: Express): Promise<void> {
     max: 30, // limit inbound webhook to 30 requests per minute
   });
 
-  // Apply rate limiting to API routes
-  app.use("/api", apiLimiter);
+  // Apply rate limiting to API routes, except cleanup endpoint
+  app.use("/api", (req, res, next) => {
+    // Skip rate limiting for cleanup endpoint
+    if (req.path === "/cleanup") {
+      return next();
+    }
+    return apiLimiter(req, res, next);
+  });
 
   // GET /api/health - Health check endpoint
   app.get("/api/health", (req, res) => {
