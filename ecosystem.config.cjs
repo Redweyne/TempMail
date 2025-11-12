@@ -5,6 +5,7 @@ module.exports = {
     cwd: '/var/www/tempmail',
     instances: 1,
     exec_mode: 'fork',
+    env_file: '/var/www/tempmail/.env',
     env_production: {
       NODE_ENV: 'production',
       PORT: 5001,
