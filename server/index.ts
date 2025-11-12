@@ -5,10 +5,13 @@ import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 
-// Only set trust proxy in Replit environment
-// For VPS: leave at default (false) unless you set TRUST_PROXY_HOPS
+// Configure trust proxy based on environment
+// Replit needs it enabled, VPS needs it explicitly disabled (especially in PM2 cluster mode)
 if (process.env.REPL_ID) {
   app.set('trust proxy', true);
+} else {
+  // Explicitly disable for VPS to prevent PM2 cluster mode from interfering
+  app.set('trust proxy', false);
 }
 
 // Normalize BASE_PATH from environment (defaults to "/" for local dev)
