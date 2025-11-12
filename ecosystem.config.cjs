@@ -3,8 +3,8 @@ module.exports = {
     name: 'tempmail',
     script: './dist/index.js',
     cwd: '/var/www/tempmail',
-    instances: 2,
-    exec_mode: 'cluster',
+    instances: 1,
+    exec_mode: 'fork',
     env_production: {
       NODE_ENV: 'production',
       PORT: 5001,
