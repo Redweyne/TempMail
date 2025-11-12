@@ -5,15 +5,27 @@ import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 
-// Trust proxy only in Replit environment (where REPL_ID exists)
-// For VPS deployments, set TRUST_PROXY_HOPS if behind a reverse proxy (e.g., nginx)
+// Configure trust proxy based on deployment environment
+// Default: false (no proxy) - safest for direct VPS deployments
+let trustProxySetting: boolean | number = false;
+let trustProxyReason = "default (no proxy)";
+
 if (process.env.REPL_ID) {
-  app.set('trust proxy', true);
-} else if (process.env.TRUST_PROXY_HOPS) {
-  app.set('trust proxy', parseInt(process.env.TRUST_PROXY_HOPS, 10));
-} else {
-  // No proxy - direct VPS deployment
-  app.set('trust proxy', false);
+  // Replit environment - trust their proxy
+  trustProxySetting = true;
+  trustProxyReason = "Replit environment detected";
+} else if (process.env.TRUST_PROXY_HOPS && parseInt(process.env.TRUST_PROXY_HOPS, 10) > 0) {
+  // Explicit proxy configuration for VPS with reverse proxy
+  trustProxySetting = parseInt(process.env.TRUST_PROXY_HOPS, 10);
+  trustProxyReason = `explicit TRUST_PROXY_HOPS=${trustProxySetting}`;
+}
+
+app.set('trust proxy', trustProxySetting);
+console.log(`[config] trust proxy: ${trustProxySetting} (${trustProxyReason})`);
+
+// Validate the trust proxy setting matches our environment
+if (app.get('trust proxy') !== trustProxySetting) {
+  console.warn(`[config] WARNING: trust proxy mismatch! Expected ${trustProxySetting}, got ${app.get('trust proxy')}`);
 }
 
 // Normalize BASE_PATH from environment (defaults to "/" for local dev)
