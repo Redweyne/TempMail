@@ -5,12 +5,10 @@ import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 
-// Only set trust proxy in Replit environment where it's needed
-// For VPS: don't set it at all - leave at Express default
-if (process.env.REPL_ID) {
+// Set trust proxy when behind a reverse proxy (Nginx on VPS, or Replit)
+if (process.env.NODE_ENV === 'production' || process.env.REPL_ID) {
   app.set('trust proxy', true);
 }
-// Note: No else clause - we intentionally leave trust proxy unset for VPS
 
 // Normalize BASE_PATH from environment (defaults to "/" for local dev)
 const basePath = (process.env.BASE_PATH || "/").replace(/\/$/, "") || "/";
