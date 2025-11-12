@@ -5,8 +5,16 @@ import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 
-// Trust proxy for proper IP detection behind Replit's proxy
-app.set('trust proxy', true);
+// Trust proxy only in Replit environment (where REPL_ID exists)
+// For VPS deployments, set TRUST_PROXY_HOPS if behind a reverse proxy (e.g., nginx)
+if (process.env.REPL_ID) {
+  app.set('trust proxy', true);
+} else if (process.env.TRUST_PROXY_HOPS) {
+  app.set('trust proxy', parseInt(process.env.TRUST_PROXY_HOPS, 10));
+} else {
+  // No proxy - direct VPS deployment
+  app.set('trust proxy', false);
+}
 
 // Normalize BASE_PATH from environment (defaults to "/" for local dev)
 const basePath = (process.env.BASE_PATH || "/").replace(/\/$/, "") || "/";

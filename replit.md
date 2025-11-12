@@ -12,6 +12,15 @@ Redweyne is a temporary email service that allows users to create disposable ema
 
 ## Recent Changes
 
+### November 12, 2025 - VPS Security Fix: Trust Proxy Configuration
+- **Fixed trust proxy setting**: Corrected a critical security issue where `trust proxy` was unconditionally set to `true`
+- **Environment-aware configuration**: Trust proxy now automatically configures based on environment:
+  - Replit environment (REPL_ID present): trust proxy enabled for proper IP detection
+  - VPS with reverse proxy: Set TRUST_PROXY_HOPS environment variable (e.g., "1" for nginx)
+  - Direct VPS deployment: trust proxy disabled (no proxy)
+- **Security improvement**: Prevents IP-based rate limiting bypass in VPS deployments
+- **Backward compatible**: No changes needed for existing Replit deployments
+
 ### November 12, 2025 - Permanent Email Support & Cleanup Features
 - **Added permanent email aliases**: Users can now create permanent email addresses that never expire alongside temporary ones
 - **Database schema update**: Added `isPermanent` boolean field to aliases table, made `expiresAt` nullable for permanent aliases
