@@ -1,18 +1,31 @@
 import { z } from "zod";
 
-// Alias schema - temporary email addresses
+// Alias schema - temporary or permanent email addresses
 export interface Alias {
   id: string;
   email: string; // full email like "temp123@redweyne.com"
   prefix: string; // just the "temp123" part
   createdAt: string; // ISO timestamp
-  expiresAt: string; // ISO timestamp
+  expiresAt: string | null; // ISO timestamp, null for permanent aliases
+  isPermanent: boolean; // true for permanent, false for temporary
 }
 
 export const insertAliasSchema = z.object({
   prefix: z.string().min(1).max(50).optional(), // optional, auto-generate if not provided
-  ttlMinutes: z.number().int().min(1).max(120).default(30), // 1 min to 2 hours
-});
+  isPermanent: z.boolean().default(false), // default to temporary
+  ttlMinutes: z.number().int().min(1).max(120).default(30), // 1 min to 2 hours, default 30
+}).refine(
+  (data) => {
+    // Validate ttlMinutes is a finite integer when provided
+    if (data.ttlMinutes !== undefined && !Number.isFinite(data.ttlMinutes)) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: "ttlMinutes must be a valid integer",
+  }
+);
 
 export type InsertAlias = z.infer<typeof insertAliasSchema>;
 

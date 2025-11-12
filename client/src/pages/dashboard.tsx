@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Search, Mail } from "lucide-react";
 import { AliasList } from "@/components/alias-list";
 import { EmailList } from "@/components/email-list";
@@ -15,6 +16,7 @@ export default function Dashboard() {
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"temporary" | "permanent">("temporary");
 
   // Fetch all aliases with real-time polling
   const { data: aliases = [], isLoading: aliasesLoading } = useQuery<Alias[]>({
@@ -29,10 +31,12 @@ export default function Dashboard() {
     refetchInterval: selectedAliasId ? 3000 : false, // Poll every 3 seconds when alias is selected
   });
 
-  // Filter aliases based on search
-  const filteredAliases = aliases.filter((alias) =>
-    alias.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter aliases based on tab and search
+  const filteredAliases = aliases.filter((alias) => {
+    const matchesSearch = alias.email.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesTab = activeTab === "temporary" ? !alias.isPermanent : alias.isPermanent;
+    return matchesSearch && matchesTab;
+  });
 
   const selectedAlias = aliases.find((a) => a.id === selectedAliasId);
   const selectedEmail = emails.find((e) => e.id === selectedEmailId);
@@ -59,8 +63,22 @@ export default function Dashboard() {
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar - Alias List */}
         <aside className="w-80 border-r flex flex-col bg-card">
-          {/* Search */}
+          {/* Tabs */}
           <div className="p-4 border-b">
+            <Tabs value={activeTab} onValueChange={(value) => {
+              setActiveTab(value as "temporary" | "permanent");
+              setSelectedAliasId(null);
+              setSelectedEmailId(null);
+            }}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="temporary">Temporary</TabsTrigger>
+                <TabsTrigger value="permanent">Permanent</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+
+          {/* Search */}
+          <div className="px-4 pb-4 border-b">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -132,6 +150,7 @@ export default function Dashboard() {
       <CreateAliasDialog
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
+        isPermanent={activeTab === "permanent"}
       />
     </div>
   );

@@ -190,12 +190,14 @@ export async function registerRoutes(app: Express): Promise<void> {
         return res.status(404).json({ message: "Alias not found" });
       }
 
-      // Check if alias is expired
-      const now = new Date();
-      const expiresAt = new Date(alias.expiresAt);
-      if (now > expiresAt) {
-        console.warn(`Alias ${recipientEmail} has expired`);
-        return res.status(410).json({ message: "Alias expired" });
+      // Check if temporary alias is expired (permanent aliases never expire)
+      if (!alias.isPermanent && alias.expiresAt) {
+        const now = new Date();
+        const expiresAt = new Date(alias.expiresAt);
+        if (now > expiresAt) {
+          console.warn(`Alias ${recipientEmail} has expired`);
+          return res.status(410).json({ message: "Alias expired" });
+        }
       }
 
       // Store email

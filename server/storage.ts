@@ -28,7 +28,47 @@ export class SqliteStorage implements IStorage {
 
   constructor() {
     this.db = new Database("emails.db");
+    this.runMigrations();
     this.initTables();
+  }
+
+  private runMigrations() {
+    try {
+      const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='aliases'").get();
+      
+      if (tables) {
+        const columns = this.db.prepare("PRAGMA table_info(aliases)").all() as any[];
+        const hasIsPermanent = columns.some((col) => col.name === 'isPermanent');
+        
+        if (!hasIsPermanent) {
+          console.log('Running migration: Adding isPermanent column to aliases table');
+          this.db.exec(`
+            ALTER TABLE aliases ADD COLUMN isPermanent INTEGER NOT NULL DEFAULT 0;
+          `);
+          
+          console.log('Migration: Making expiresAt nullable');
+          this.db.exec(`
+            CREATE TABLE aliases_new (
+              id TEXT PRIMARY KEY,
+              email TEXT NOT NULL UNIQUE,
+              prefix TEXT NOT NULL,
+              createdAt TEXT NOT NULL,
+              expiresAt TEXT,
+              isPermanent INTEGER NOT NULL DEFAULT 0
+            );
+            
+            INSERT INTO aliases_new (id, email, prefix, createdAt, expiresAt, isPermanent)
+            SELECT id, email, prefix, createdAt, expiresAt, 0 FROM aliases;
+            
+            DROP TABLE aliases;
+            ALTER TABLE aliases_new RENAME TO aliases;
+          `);
+          console.log('Migration completed successfully');
+        }
+      }
+    } catch (error) {
+      console.log('Migration not needed or already applied', error);
+    }
   }
 
   private initTables() {
@@ -39,7 +79,8 @@ export class SqliteStorage implements IStorage {
         email TEXT NOT NULL UNIQUE,
         prefix TEXT NOT NULL,
         createdAt TEXT NOT NULL,
-        expiresAt TEXT NOT NULL
+        expiresAt TEXT,
+        isPermanent INTEGER NOT NULL DEFAULT 0
       )
     `);
 
@@ -75,21 +116,29 @@ export class SqliteStorage implements IStorage {
 
     // Auto-generate prefix if not provided
     if (!prefix) {
-      prefix = `temp-${randomUUID().slice(0, 8)}`;
+      const prefixType = data.isPermanent ? 'perm' : 'temp';
+      prefix = `${prefixType}-${randomUUID().slice(0, 8)}`;
     }
 
     const email = `${prefix}@redweyne.com`;
     const createdAt = new Date().toISOString();
-    const expiresAt = dayjs().add(data.ttlMinutes, "minute").toISOString();
+    const isPermanent = data.isPermanent ? 1 : 0;
+    const expiresAt = data.isPermanent 
+      ? null 
+      : dayjs().add(data.ttlMinutes || 30, "minute").toISOString();
 
     const stmt = this.db.prepare(`
-      INSERT INTO aliases (id, email, prefix, createdAt, expiresAt)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO aliases (id, email, prefix, createdAt, expiresAt, isPermanent)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
 
-    stmt.run(id, email, prefix, createdAt, expiresAt);
+    stmt.run(id, email, prefix, createdAt, expiresAt, isPermanent);
 
-    return { id, email, prefix, createdAt, expiresAt };
+    const inserted = this.getAliasById(id);
+    if (!inserted) {
+      throw new Error("Failed to create alias");
+    }
+    return inserted;
   }
 
   getAllAliases(): Alias[] {
@@ -98,7 +147,11 @@ export class SqliteStorage implements IStorage {
       ORDER BY createdAt DESC
     `);
 
-    return stmt.all() as Alias[];
+    const rows = stmt.all() as any[];
+    return rows.map((row) => ({
+      ...row,
+      isPermanent: row.isPermanent === 1,
+    }));
   }
 
   getAliasByEmail(email: string): Alias | undefined {
@@ -106,7 +159,13 @@ export class SqliteStorage implements IStorage {
       SELECT * FROM aliases WHERE email = ?
     `);
 
-    return stmt.get(email) as Alias | undefined;
+    const row = stmt.get(email) as any;
+    if (!row) return undefined;
+
+    return {
+      ...row,
+      isPermanent: row.isPermanent === 1,
+    };
   }
 
   getAliasById(id: string): Alias | undefined {
@@ -114,7 +173,13 @@ export class SqliteStorage implements IStorage {
       SELECT * FROM aliases WHERE id = ?
     `);
 
-    return stmt.get(id) as Alias | undefined;
+    const row = stmt.get(id) as any;
+    if (!row) return undefined;
+
+    return {
+      ...row,
+      isPermanent: row.isPermanent === 1,
+    };
   }
 
   deleteAlias(id: string): void {
@@ -198,22 +263,24 @@ export class SqliteStorage implements IStorage {
     stmt.run(id);
   }
 
-  // Cleanup methods
+  // Cleanup methods - only delete temporary aliases and their emails
   deleteExpiredAliases(): number {
     const now = new Date().toISOString();
 
-    // First delete associated emails
+    // First delete associated emails from expired temporary aliases
     const emailStmt = this.db.prepare(`
       DELETE FROM emails
       WHERE aliasId IN (
-        SELECT id FROM aliases WHERE expiresAt <= ?
+        SELECT id FROM aliases 
+        WHERE isPermanent = 0 AND expiresAt IS NOT NULL AND expiresAt <= ?
       )
     `);
     emailStmt.run(now);
 
-    // Then delete expired aliases
+    // Then delete expired temporary aliases only
     const aliasStmt = this.db.prepare(`
-      DELETE FROM aliases WHERE expiresAt <= ?
+      DELETE FROM aliases 
+      WHERE isPermanent = 0 AND expiresAt IS NOT NULL AND expiresAt <= ?
     `);
 
     const result = aliasStmt.run(now);
@@ -221,11 +288,12 @@ export class SqliteStorage implements IStorage {
   }
 
   deleteExpiredEmails(): number {
-    // Delete emails whose parent alias has expired
+    // Delete emails whose parent temporary alias has expired
     const stmt = this.db.prepare(`
       DELETE FROM emails
       WHERE aliasId IN (
-        SELECT id FROM aliases WHERE expiresAt <= ?
+        SELECT id FROM aliases 
+        WHERE isPermanent = 0 AND expiresAt IS NOT NULL AND expiresAt <= ?
       )
     `);
 

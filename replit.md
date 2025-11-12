@@ -10,6 +10,23 @@ Redweyne is a temporary email service that allows users to create disposable ema
 - Deployment target: VPS at redweyne.com/tempmail (standalone, separate from main site)
 - No assumptions: User doesn't use Nginx - provide web-server agnostic guidance
 
+## Recent Changes
+
+### November 12, 2025 - Permanent Email Support & Cleanup Features
+- **Added permanent email aliases**: Users can now create permanent email addresses that never expire alongside temporary ones
+- **Database schema update**: Added `isPermanent` boolean field to aliases table, made `expiresAt` nullable for permanent aliases
+- **Automatic database migration**: Existing databases automatically upgrade to support the new schema on server restart
+- **Cleanup mechanism enhancement**: Cleanup routines now only delete temporary (non-permanent) aliases and their emails
+- **UI improvements**: 
+  - Added tabs in dashboard to separate temporary and permanent email aliases
+  - Create dialog adapts based on selected tab (shows/hides TTL selector)
+  - Automatic prefix generation distinguishes between 'temp-' and 'perm-' prefixes
+- **Backend updates**:
+  - Inbound email handler properly handles permanent aliases (no expiration check)
+  - Storage layer filters cleanup operations to only affect temporary aliases
+  - API maintains backward compatibility while supporting new features
+- **VPS compatibility**: All changes designed to work seamlessly with existing VPS deployments (push to GitHub, pull on VPS, restart)
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -76,8 +93,9 @@ Redweyne is a temporary email service that allows users to create disposable ema
 - `email`: Full email address (e.g., "temp123@redweyne.com")
 - `prefix`: User-facing identifier
 - `createdAt`: ISO timestamp
-- `expiresAt`: ISO timestamp for auto-cleanup
-- `ttlMinutes`: Configurable lifespan (1-120 minutes, default 30)
+- `expiresAt`: ISO timestamp for auto-cleanup (nullable for permanent aliases)
+- `isPermanent`: Boolean flag (true for permanent, false for temporary)
+- `ttlMinutes`: Configurable lifespan (1-120 minutes, default 30) - only applies to temporary aliases
 
 **Email Schema**
 - `id`: UUID primary key

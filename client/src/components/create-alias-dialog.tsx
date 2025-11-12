@@ -27,9 +27,10 @@ import type { Alias, InsertAlias } from "@shared/schema";
 interface CreateAliasDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  isPermanent?: boolean;
 }
 
-export function CreateAliasDialog({ open, onOpenChange }: CreateAliasDialogProps) {
+export function CreateAliasDialog({ open, onOpenChange, isPermanent = false }: CreateAliasDialogProps) {
   const { toast } = useToast();
   const [prefix, setPrefix] = useState("");
   const [ttlMinutes, setTtlMinutes] = useState("30");
@@ -47,7 +48,7 @@ export function CreateAliasDialog({ open, onOpenChange }: CreateAliasDialogProps
       setCreatedAlias(data);
       toast({
         title: "Alias created!",
-        description: `Your temporary email ${data.email} is ready to use.`,
+        description: `Your ${isPermanent ? 'permanent' : 'temporary'} email ${data.email} is ready to use.`,
       });
     },
     onError: (error: any) => {
@@ -63,6 +64,7 @@ export function CreateAliasDialog({ open, onOpenChange }: CreateAliasDialogProps
     e.preventDefault();
     
     const data: InsertAlias = {
+      isPermanent: isPermanent,
       ttlMinutes: parseInt(ttlMinutes),
     };
 
@@ -97,11 +99,13 @@ export function CreateAliasDialog({ open, onOpenChange }: CreateAliasDialogProps
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md" data-testid="dialog-create-alias">
         <DialogHeader>
-          <DialogTitle>Create Temporary Alias</DialogTitle>
+          <DialogTitle>Create {isPermanent ? 'Permanent' : 'Temporary'} Alias</DialogTitle>
           <DialogDescription>
             {createdAlias
-              ? "Your temporary email address is ready!"
-              : "Set up a new temporary email address with auto-expiry."}
+              ? `Your ${isPermanent ? 'permanent' : 'temporary'} email address is ready!`
+              : isPermanent 
+                ? "Set up a permanent email address that never expires."
+                : "Set up a new temporary email address with auto-expiry."}
           </DialogDescription>
         </DialogHeader>
 
@@ -129,13 +133,19 @@ export function CreateAliasDialog({ open, onOpenChange }: CreateAliasDialogProps
             </div>
 
             <p className="text-sm text-muted-foreground">
-              This alias will expire in{" "}
-              <span className="font-medium text-foreground">
-                {Math.floor(parseInt(ttlMinutes) / 60) > 0
-                  ? `${Math.floor(parseInt(ttlMinutes) / 60)} hour${Math.floor(parseInt(ttlMinutes) / 60) > 1 ? "s" : ""}`
-                  : `${ttlMinutes} minutes`}
-              </span>
-              . Use it anywhere and emails will arrive instantly.
+              {isPermanent ? (
+                "This alias is permanent and will never expire. Emails sent to it will be stored indefinitely."
+              ) : (
+                <>
+                  This alias will expire in{" "}
+                  <span className="font-medium text-foreground">
+                    {Math.floor(parseInt(ttlMinutes) / 60) > 0
+                      ? `${Math.floor(parseInt(ttlMinutes) / 60)} hour${Math.floor(parseInt(ttlMinutes) / 60) > 1 ? "s" : ""}`
+                      : `${ttlMinutes} minutes`}
+                  </span>
+                  . Use it anywhere and emails will arrive instantly.
+                </>
+              )}
             </p>
 
             <Button onClick={handleClose} className="w-full" data-testid="button-done">
@@ -179,26 +189,28 @@ export function CreateAliasDialog({ open, onOpenChange }: CreateAliasDialogProps
                 </Label>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="ttl" className="text-sm font-medium">
-                  Expires In
-                </Label>
-                <Select
-                  value={ttlMinutes}
-                  onValueChange={setTtlMinutes}
-                  disabled={createMutation.isPending}
-                >
-                  <SelectTrigger id="ttl" data-testid="select-ttl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="15">15 minutes</SelectItem>
-                    <SelectItem value="30">30 minutes</SelectItem>
-                    <SelectItem value="60">1 hour</SelectItem>
-                    <SelectItem value="120">2 hours</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {!isPermanent && (
+                <div className="space-y-2">
+                  <Label htmlFor="ttl" className="text-sm font-medium">
+                    Expires In
+                  </Label>
+                  <Select
+                    value={ttlMinutes}
+                    onValueChange={setTtlMinutes}
+                    disabled={createMutation.isPending}
+                  >
+                    <SelectTrigger id="ttl" data-testid="select-ttl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="15">15 minutes</SelectItem>
+                      <SelectItem value="30">30 minutes</SelectItem>
+                      <SelectItem value="60">1 hour</SelectItem>
+                      <SelectItem value="120">2 hours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <DialogFooter>
