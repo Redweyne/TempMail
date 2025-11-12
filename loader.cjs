@@ -22,5 +22,8 @@ process.env.NODE_ENV = 'production';
 process.env.PORT = '5001';
 process.env.BASE_PATH = '/tempmail';
 
-// Start the application
-require('./dist/index.js');
+// Start the application using dynamic import for ESM
+import('./dist/index.js').catch(err => {
+  console.error('Failed to start application:', err);
+  process.exit(1);
+});
