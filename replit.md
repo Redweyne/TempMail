@@ -12,37 +12,56 @@ Redweyne is a temporary email service that allows users to create disposable ema
 
 ## Recent Changes
 
-### November 13, 2025 - Nginx Reverse Proxy Configuration Fix
-- **Issue**: After deploying to VPS with trust proxy fix, `redweyne.com/tempmail` still wouldn't load (404 errors)
-- **Root cause**: Nginx `location /tempmail` block missing trailing slashes
-- **The problem**:
-  - Without trailing slash: `location /tempmail` only matches exact path `/tempmail`
-  - Requests to `/tempmail/`, `/tempmail/dashboard`, `/tempmail/api/*` didn't match → 404 errors
-- **The fix**: Updated nginx configuration in `/etc/nginx/sites-available/InboxAI` on VPS:
-  ```nginx
-  # BEFORE (broken):
-  location /tempmail {
-      proxy_pass http://127.0.0.1:5001;
+### November 13, 2025 - Nginx Reverse Proxy Configuration Fix (CORRECTED)
+- **Issue #1**: `redweyne.com/tempmail` returned 404 errors
+  - **Cause**: `location /tempmail` without trailing slash only matched exact path
+  - **First attempted fix**: Added trailing slash to location AND proxy_pass path → WRONG
+  - **Result**: "Connection refused" errors (worse than before)
   
-  # AFTER (working):
+- **Issue #2**: After adding trailing slashes, got "Connection refused" from nginx
+  - **Cause**: Using `proxy_pass http://127.0.0.1:5001/tempmail/;` with a path causes nginx to strip and rewrite paths incorrectly
+  - **Root problem**: When proxy_pass includes a URI path, nginx rewrites the request path unexpectedly
+  
+- **THE CORRECT FIX** (tested and working):
+  ```nginx
+  # In /etc/nginx/sites-available/InboxAI:
+  
   location /tempmail/ {
-      proxy_pass http://127.0.0.1:5001/tempmail/;
+      proxy_pass http://127.0.0.1:5001;  # NO PATH HERE - just port!
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_read_timeout 300s;
+      client_max_body_size 10M;
+  }
   ```
-- **Why this works**: 
-  - `location /tempmail/` matches all paths under /tempmail/
-  - `proxy_pass http://127.0.0.1:5001/tempmail/` preserves the full path when forwarding to Express
+  
+- **Key insight**: 
+  - ✅ `location /tempmail/` with trailing slash = matches all subpaths
+  - ✅ `proxy_pass http://127.0.0.1:5001;` WITHOUT path = preserves full request path
+  - ❌ `proxy_pass http://127.0.0.1:5001/tempmail/;` WITH path = causes path rewriting issues
+  - Express app already handles BASE_PATH=/tempmail internally, so nginx just needs to forward the complete path
+  
+- **How it works**:
+  1. Browser requests: `https://redweyne.com/tempmail/dashboard`
+  2. Nginx forwards: `http://127.0.0.1:5001/tempmail/dashboard` (complete path preserved)
+  3. Express app (BASE_PATH=/tempmail) routes correctly
+  
 - **Deployment steps**:
   ```bash
-  # On VPS:
   nano /etc/nginx/sites-available/InboxAI
-  # Add trailing slashes to location and proxy_pass
+  # Line 5: location /tempmail/ {
+  # Line 6: proxy_pass http://127.0.0.1:5001;  (NO /tempmail/ at end!)
+  # Save: Ctrl+X, Y, Enter
   nginx -t
   systemctl reload nginx
   ```
-- **Documentation updated**:
-  - `STANDALONE_DEPLOYMENT.md` - Fixed nginx config example with trailing slashes
-  - `NGINX_FIX_GUIDE.md` - Created quick reference guide for this fix
-- **Important**: Nginx config files are system files on VPS, NOT part of the application code. They can't be pushed/pulled via Git - must be edited directly on the server (one-time setup).
+  
+- **Important**: Nginx config is a system file on VPS in `/etc/nginx/`, NOT in application code. Can't be pushed/pulled via Git.
 
 ### November 13, 2025 - Trust Proxy Configuration Fix for VPS Deployment
 - **Fixed trust proxy configuration**: Introduced explicit `TRUST_PROXY` environment variable to properly handle deployments behind reverse proxies
