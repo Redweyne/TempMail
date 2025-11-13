@@ -12,6 +12,21 @@ Redweyne is a temporary email service that allows users to create disposable ema
 
 ## Recent Changes
 
+### November 13, 2025 - THE ACTUAL FIX: Vite Base Path Configuration
+- **Root cause**: The `vite.config.ts` was missing the `base` option, so frontend builds always used `/` instead of `/tempmail`
+- **Symptom**: Frontend loaded but all API calls failed because they went to `/api/*` instead of `/tempmail/api/*`
+- **Fix applied**:
+  1. Added `base: process.env.BASE_URL || '/'` to vite.config.ts
+  2. Added `build:vps` script to package.json that sets `BASE_URL=/tempmail`
+- **VPS Deployment**:
+  ```bash
+  cd /var/www/tempmail
+  git pull
+  npm run build:vps
+  pm2 restart tempmail
+  ```
+- **Expected result**: Site loads and works at redweyne.com/tempmail - frontend now knows it's at /tempmail
+
 ### November 13, 2025 - FINAL FIX: express-rate-limit Validation
 - **Issue**: express-rate-limit v8 has strict validation that throws ValidationError even when trust proxy is correctly configured
 - **Solution**: Added `validate: { xForwardedForHeader: false }` to rate limiter configuration
