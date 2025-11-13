@@ -10,6 +10,7 @@ import { EmailViewer } from "@/components/email-viewer";
 import { CreateAliasDialog } from "@/components/create-alias-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import type { Alias, Email } from "@shared/schema";
 
 export default function Dashboard() {
@@ -47,13 +48,7 @@ export default function Dashboard() {
   // Cleanup expired aliases mutation
   const cleanupMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch("/api/cleanup", {
-        method: "GET",
-        credentials: "include",
-      });
-      if (!response.ok) {
-        throw new Error("Failed to cleanup expired items");
-      }
+      const response = await apiRequest("GET", "/api/cleanup");
       return response.json() as Promise<{
         message: string;
         deletedAliases: number;

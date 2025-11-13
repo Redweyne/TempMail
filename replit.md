@@ -151,13 +151,27 @@ Redweyne is a temporary email service that allows users to create disposable ema
 - **Production build compatibility**: Loader is now a pure ES module that properly loads the esbuild output
 - **Note**: PM2 caches the script path when a process starts. Renaming the entry script requires either keeping the same filename or running `pm2 delete tempmail && pm2 start ecosystem.config.cjs`
 
-### November 13, 2025 - Automatic Cleanup System Added
-- **Issue found**: Cleanup only ran manually when user clicked "Clean Expired" button - no automatic cleanup existed
-- **Fix**: Added automatic cleanup that runs every 5 minutes in production (30 seconds in dev)
+### November 13, 2025 - Automatic Cleanup System Added + Cleanup Button Fix
+- **Issue #1**: Cleanup only ran manually when user clicked "Clean Expired" button - no automatic cleanup existed
+- **Issue #2**: "Clean Expired" button wasn't using base path helper - would fail on VPS at `/tempmail`
+- **Fix #1**: Added automatic cleanup that runs every 5 minutes in production (30 seconds in dev)
+- **Fix #2**: Updated cleanup button to use `apiRequest()` helper which respects base path
 - **Implementation**: `setInterval()` in `server/index.ts` that calls `storage.deleteExpiredAliases()` and `storage.deleteExpiredEmails()`
 - **Safety**: Cleanup ONLY deletes temporary aliases (`isPermanent = 0`), never touches permanent aliases or their emails
 - **Logging**: Server logs show `Auto-cleanup: deleted X expired temporary aliases, Y emails` when items are removed
 - **Why important**: Prevents database from filling up with expired temporary aliases and emails over time
+
+**CRITICAL CLARIFICATION - How cleanup timing works:**
+- ⏱️ **Cleanup interval (5 min)** = how often we CHECK for expired items
+- ⌛ **TTL (30 min)** = how long emails ACTUALLY live before expiring
+- **Example**: User creates 30-minute alias at 3:00 PM
+  - 3:05 PM → Cleanup runs, finds nothing expired, does nothing ✅
+  - 3:10 PM → Cleanup runs, finds nothing expired, does nothing ✅
+  - 3:30 PM → Alias expires (30 minutes passed)
+  - 3:35 PM → Cleanup runs, finds expired alias, deletes it 🗑️
+  - **Email lived for FULL 30 minutes** as expected!
+
+**VPS Compatibility:** ✅ All changes are VPS-safe and backend-only. No Vite config changes. Safe to deploy.
 
 ### November 12, 2025 - Permanent Email Support & Cleanup Features
 - **Added permanent email aliases**: Users can now create permanent email addresses that never expire alongside temporary ones
@@ -196,9 +210,14 @@ aliases table:
 
 **Cleanup System (AUTOMATIC):**
 
-1. **Auto-cleanup runs every:**
+1. **Auto-cleanup CHECK interval** (how often we look for expired items):
    - Production: Every 5 minutes
    - Development: Every 30 seconds
+   
+   **IMPORTANT**: This is NOT when emails expire! This is just how often we check.
+   - If you create a 30-minute temporary alias, it lives for FULL 30 minutes
+   - Cleanup runs might happen at 5min, 10min, 15min, etc... but do nothing
+   - Only at 30+ minutes will cleanup find it expired and delete it
    
 2. **What gets deleted:**
    ```sql
