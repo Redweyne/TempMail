@@ -12,20 +12,42 @@ Redweyne is a temporary email service that allows users to create disposable ema
 
 ## Recent Changes
 
-### November 13, 2025 - THE ACTUAL FIX: Vite Base Path Configuration
-- **Root cause**: The `vite.config.ts` was missing the `base` option, so frontend builds always used `/` instead of `/tempmail`
-- **Symptom**: Frontend loaded but all API calls failed because they went to `/api/*` instead of `/tempmail/api/*`
-- **Fix applied**:
+### November 13, 2025 - THE ACTUAL FIX: Vite Base Path Configuration ⭐ SOLVED AFTER 3 DAYS
+- **What went wrong for 3 days**: 
+  - We spent 3 days debugging trust proxy, nginx configs, PM2 settings, rate limiters
+  - All those fixes were correct but the site STILL didn't load
+  - The real issue: Frontend was built thinking it lived at `/` but VPS served it at `/tempmail`
+  
+- **The smoking gun**:
+  - Browser tried loading `/assets/index.js` ❌ (returned 404)
+  - Should have loaded `/tempmail/assets/index.js` ✅
+  - Frontend made API calls to `/api/*` ❌ (returned 404)
+  - Should have called `/tempmail/api/*` ✅
+  
+- **Root cause**: 
+  - `vite.config.ts` was missing `base: process.env.BASE_URL`
+  - When you ran `npm run build` on VPS, Vite defaulted to `base: '/'`
+  - Built assets had wrong paths hardcoded
+  
+- **The fix**:
   1. Added `base: process.env.BASE_URL || '/'` to vite.config.ts
-  2. Added `build:vps` script to package.json that sets `BASE_URL=/tempmail`
-- **VPS Deployment**:
+  2. Created `build:vps` script: `BASE_URL=/tempmail NODE_ENV=production vite build && esbuild...`
+  3. Now build output has correct paths: `/tempmail/assets/*`, `/tempmail/api/*`
+  
+- **CRITICAL - Use this command on VPS**:
   ```bash
   cd /var/www/tempmail
   git pull
-  npm run build:vps
+  npm run build:vps  # ← NOT "npm run build" - must use build:vps!
   pm2 restart tempmail
   ```
-- **Expected result**: Site loads and works at redweyne.com/tempmail - frontend now knows it's at /tempmail
+  
+- **Why we got fooled**:
+  - Replit dev server worked fine because it runs at `/` (no base path needed)
+  - VPS production needs `/tempmail` base path
+  - We were fixing the backend (which was fine!) but frontend was broken
+  
+- **Lesson learned**: When deploying to subpaths like `/tempmail`, the frontend build MUST know about it via Vite's `base` option. Don't waste 3 days on other fixes when assets are loading from wrong paths!
 
 ### November 13, 2025 - FINAL FIX: express-rate-limit Validation
 - **Issue**: express-rate-limit v8 has strict validation that throws ValidationError even when trust proxy is correctly configured
@@ -129,6 +151,14 @@ Redweyne is a temporary email service that allows users to create disposable ema
 - **Production build compatibility**: Loader is now a pure ES module that properly loads the esbuild output
 - **Note**: PM2 caches the script path when a process starts. Renaming the entry script requires either keeping the same filename or running `pm2 delete tempmail && pm2 start ecosystem.config.cjs`
 
+### November 13, 2025 - Automatic Cleanup System Added
+- **Issue found**: Cleanup only ran manually when user clicked "Clean Expired" button - no automatic cleanup existed
+- **Fix**: Added automatic cleanup that runs every 5 minutes in production (30 seconds in dev)
+- **Implementation**: `setInterval()` in `server/index.ts` that calls `storage.deleteExpiredAliases()` and `storage.deleteExpiredEmails()`
+- **Safety**: Cleanup ONLY deletes temporary aliases (`isPermanent = 0`), never touches permanent aliases or their emails
+- **Logging**: Server logs show `Auto-cleanup: deleted X expired temporary aliases, Y emails` when items are removed
+- **Why important**: Prevents database from filling up with expired temporary aliases and emails over time
+
 ### November 12, 2025 - Permanent Email Support & Cleanup Features
 - **Added permanent email aliases**: Users can now create permanent email addresses that never expire alongside temporary ones
 - **Database schema update**: Added `isPermanent` boolean field to aliases table, made `expiresAt` nullable for permanent aliases
@@ -147,6 +177,73 @@ Redweyne is a temporary email service that allows users to create disposable ema
   - API maintains backward compatibility while supporting new features
 - **VPS compatibility**: All changes designed to work seamlessly with existing VPS deployments (push to GitHub, pull on VPS, restart)
 - **Development note**: Replit dev banner only appears in development mode (when NODE_ENV !== "production"). Production builds for VPS deployment do not include the banner.
+
+## Critical System Behaviors
+
+### Permanent vs Temporary Aliases - HOW IT WORKS
+
+**The Guarantee:**
+- ✅ **Permanent aliases NEVER expire** and **their emails are NEVER deleted**
+- ✅ **Temporary aliases expire** after their TTL and **are automatically deleted along with all their emails**
+
+**Database Design:**
+```typescript
+aliases table:
+  - isPermanent: boolean (true = permanent, false = temporary)
+  - expiresAt: timestamp | null (null for permanent, set for temporary)
+  - ttlMinutes: number (only applies to temporary)
+```
+
+**Cleanup System (AUTOMATIC):**
+
+1. **Auto-cleanup runs every:**
+   - Production: Every 5 minutes
+   - Development: Every 30 seconds
+   
+2. **What gets deleted:**
+   ```sql
+   -- Only deletes temporary aliases (isPermanent = 0)
+   DELETE FROM aliases 
+   WHERE isPermanent = 0 
+     AND expiresAt IS NOT NULL 
+     AND expiresAt <= NOW()
+   
+   -- Deletes emails from expired temporary aliases
+   DELETE FROM emails
+   WHERE aliasId IN (
+     SELECT id FROM aliases 
+     WHERE isPermanent = 0 
+       AND expiresAt IS NOT NULL 
+       AND expiresAt <= NOW()
+   )
+   ```
+
+3. **What is PROTECTED:**
+   - Any alias with `isPermanent = 1` (permanent aliases)
+   - ALL emails belonging to permanent aliases
+   - Temporary aliases that haven't expired yet
+   
+4. **Inbound Email Handling:**
+   - Permanent aliases: Always accept emails (no expiry check)
+   - Temporary aliases: Check if expired before accepting
+   
+**Manual Cleanup:**
+- Users can click "Clean Expired" button in dashboard
+- Calls `/api/cleanup` endpoint
+- Same logic as auto-cleanup (only temporary aliases)
+
+**Code Locations:**
+- Cleanup logic: `server/storage.ts` → `deleteExpiredAliases()`, `deleteExpiredEmails()`
+- Auto-cleanup: `server/index.ts` → `setInterval()` at startup
+- Manual cleanup: `server/routes.ts` → `GET /api/cleanup`
+- Inbound filtering: `server/routes.ts` → `POST /api/inbound` (line 202)
+
+**Testing Cleanup:**
+1. Create a temporary alias with 1-minute TTL
+2. Wait for expiry
+3. Check logs for: `Auto-cleanup: deleted X expired temporary aliases, Y emails`
+4. Verify temporary alias is gone from database
+5. Create a permanent alias - confirm it NEVER gets deleted
 
 ## System Architecture
 

@@ -105,6 +105,26 @@ app.use((req, res, next) => {
   // Mount the scoped app under basePath on the root app
   app.use(basePath, scopedApp);
 
+  // Setup automatic cleanup for expired temporary aliases and emails
+  // Run every 5 minutes in production, every 30 seconds in development
+  const cleanupInterval = app.get("env") === "development" ? 30000 : 5 * 60 * 1000;
+  
+  setInterval(async () => {
+    try {
+      const { storage } = await import("./storage");
+      const deletedAliases = storage.deleteExpiredAliases();
+      const deletedEmails = storage.deleteExpiredEmails();
+      
+      if (deletedAliases > 0 || deletedEmails > 0) {
+        log(`Auto-cleanup: deleted ${deletedAliases} expired temporary aliases, ${deletedEmails} emails`);
+      }
+    } catch (error) {
+      console.error("Error in automatic cleanup:", error);
+    }
+  }, cleanupInterval);
+  
+  log(`Automatic cleanup enabled: running every ${cleanupInterval / 1000}s`);
+
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
