@@ -12,6 +12,19 @@ Redweyne is a temporary email service that allows users to create disposable ema
 
 ## Recent Changes
 
+### November 13, 2025 - FINAL FIX: express-rate-limit Validation
+- **Issue**: express-rate-limit v8 has strict validation that throws ValidationError even when trust proxy is correctly configured
+- **Solution**: Added `validate: { xForwardedForHeader: false }` to rate limiter configuration
+- **Why**: The validation check in express-rate-limit was incorrectly reporting trust proxy as false even though it was set correctly on both apps
+- **Deploy now**: 
+  ```bash
+  cd /var/www/tempmail
+  git pull
+  npm run build
+  pm2 restart tempmail
+  ```
+- **Expected**: No more ValidationError messages, application works correctly
+
 ### November 13, 2025 - CRITICAL FIX: Trust Proxy on Scoped App
 - **Root cause identified**: Trust proxy was set on root Express app but NOT on `scopedApp` where all middleware runs
 - **Symptom**: Application wouldn't load on VPS - rate limiter threw ValidationError about X-Forwarded-For headers

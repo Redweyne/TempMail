@@ -21,11 +21,13 @@ export async function registerRoutes(app: Express): Promise<void> {
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100, // limit each IP to 100 requests per windowMs
     message: "Too many requests from this IP, please try again later.",
+    validate: { xForwardedForHeader: false }, // Disable strict validation - trust proxy is already configured
   });
 
   const inboundLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 minute
     max: 30, // limit inbound webhook to 30 requests per minute
+    validate: { xForwardedForHeader: false }, // Disable strict validation - trust proxy is already configured
   });
 
   // Apply rate limiting to API routes, except cleanup endpoint
