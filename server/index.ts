@@ -5,9 +5,20 @@ import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 
-// Trust proxy only in Replit environment to avoid rate limiting bypass on VPS
-if (process.env.REPL_ID) {
-  app.set('trust proxy', 1);
+// Configure trust proxy for deployments behind reverse proxies
+// TRUST_PROXY can be: "loopback" (default for VPS), number (hop count), or boolean
+// Replit: defaults to 1 hop; VPS behind nginx/similar: use "loopback"
+// Direct deployments without reverse proxy: leave unset or set to false
+const trustProxyConfig = process.env.TRUST_PROXY 
+  ? (process.env.TRUST_PROXY === 'true' ? true : 
+     process.env.TRUST_PROXY === 'false' ? false :
+     isNaN(Number(process.env.TRUST_PROXY)) ? process.env.TRUST_PROXY : 
+     Number(process.env.TRUST_PROXY))
+  : process.env.REPL_ID ? 1 : false;
+
+if (trustProxyConfig !== false) {
+  app.set('trust proxy', trustProxyConfig);
+  log(`Trust proxy enabled: ${trustProxyConfig}`);
 }
 
 // Normalize BASE_PATH from environment (defaults to "/" for local dev)

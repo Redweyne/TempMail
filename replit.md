@@ -12,15 +12,15 @@ Redweyne is a temporary email service that allows users to create disposable ema
 
 ## Recent Changes
 
-### November 12, 2025 - Critical VPS Deployment Fix: ESM Loader & Trust Proxy
-- **Fixed ESM module loading error**: Converted loader from CommonJS to ES Module format while keeping the filename as `loader.js` for PM2 compatibility
-- **Fixed trust proxy bypass vulnerability**: Trust proxy now ONLY enabled in Replit environment (when REPL_ID exists), disabled on VPS
-- **Production build compatibility**: Loader is now a pure ES module that properly loads the esbuild output
-- **Security improvement**: Eliminates IP-based rate limiting bypass on VPS deployments
-- **What changed**: 
-  - Converted `loader.cjs` → `loader.js` with ES module syntax (PM2 caches script paths, so keeping the same filename avoids recreation)
-  - Updated `ecosystem.config.cjs` to point to `./loader.js`
-  - Removed trust proxy on VPS to prevent security warnings and rate limit bypass
+### November 13, 2025 - Trust Proxy Configuration Fix for VPS Deployment
+- **Fixed trust proxy configuration**: Introduced explicit `TRUST_PROXY` environment variable to properly handle deployments behind reverse proxies
+- **VPS deployment fix**: Rate limiting now works correctly on VPS by trusting local reverse proxy (nginx) via `TRUST_PROXY="loopback"`
+- **Security improvement**: Prevents X-Forwarded-For header spoofing while allowing proper client IP identification for rate limiting
+- **What changed**:
+  - Added flexible `TRUST_PROXY` env variable support in `server/index.ts` (accepts: "loopback", numeric hop count, boolean, or custom CIDR)
+  - Updated `loader.js` to set `TRUST_PROXY="loopback"` by default for VPS (only trusts local proxies)
+  - Allows .env override for custom proxy configurations (e.g., remote load balancers)
+  - Replit continues to use hop count 1 automatically (via REPL_ID detection)
 - **VPS Deployment Steps**:
   ```bash
   cd /var/www/tempmail
@@ -28,6 +28,12 @@ Redweyne is a temporary email service that allows users to create disposable ema
   npm run build
   pm2 restart tempmail
   ```
+- **Expected behavior**: Server logs should show `Trust proxy enabled: loopback` and rate limiting will now correctly identify individual client IPs
+- **Note**: For custom reverse proxy configurations, set `TRUST_PROXY` in .env file before running the loader
+
+### November 12, 2025 - ESM Loader Migration
+- **Fixed ESM module loading error**: Converted loader from CommonJS to ES Module format while keeping the filename as `loader.js` for PM2 compatibility
+- **Production build compatibility**: Loader is now a pure ES module that properly loads the esbuild output
 - **Note**: PM2 caches the script path when a process starts. Renaming the entry script requires either keeping the same filename or running `pm2 delete tempmail && pm2 start ecosystem.config.cjs`
 
 ### November 12, 2025 - Permanent Email Support & Cleanup Features

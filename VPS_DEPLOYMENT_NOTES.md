@@ -1,8 +1,68 @@
-# VPS Deployment Notes - November 12, 2025
+# VPS Deployment Notes
 
-## Summary of Changes
+## 🚨 CRITICAL FIX - November 13, 2025: Trust Proxy Configuration
 
-This document tracks all modifications made to support the three user requirements:
+### Issue
+The previous trust proxy configuration was breaking VPS deployments behind reverse proxies (nginx, caddy, etc.):
+- Trust proxy was ONLY enabled in Replit (when REPL_ID exists)
+- VPS deployments behind reverse proxies had trust proxy disabled
+- This caused Express to reject X-Forwarded-For headers
+- Rate limiting couldn't identify real client IPs (all requests appeared from proxy IP)
+- Resulted in warnings and ineffective rate limiting
+
+### Solution
+Introduced explicit `TRUST_PROXY` environment variable for secure, flexible proxy configuration:
+
+**Files Modified:**
+- `server/index.ts` - Flexible trust proxy configuration based on TRUST_PROXY env var
+- `loader.js` - Sets TRUST_PROXY="loopback" by default for VPS deployments
+
+### Deployment Steps for This Fix
+
+```bash
+# 1. Pull latest changes
+cd /var/www/tempmail
+git pull origin main
+
+# 2. Rebuild the application
+npm run build
+
+# 3. Restart PM2
+pm2 restart tempmail
+
+# 4. Verify logs show: "Trust proxy enabled: loopback"
+pm2 logs tempmail | grep "Trust proxy"
+```
+
+### Expected Behavior After Fix
+- Server logs will show: `Trust proxy enabled: loopback`
+- No more X-Forwarded-For warnings
+- Rate limiting will correctly identify individual client IPs
+- Each visitor gets their own rate limit quota instead of sharing the proxy's IP
+
+### Trust Proxy Configuration Options
+
+The `TRUST_PROXY` environment variable accepts:
+- `"loopback"` - Trust only local reverse proxies (nginx on same machine) **[Recommended for VPS]**
+- `1` - Trust first proxy in chain (Replit default)
+- `true` - Trust all proxies (⚠️ not recommended - security risk)
+- `false` or unset - No proxy trust (direct deployment only)
+- Custom CIDR notation for specific proxy IPs
+
+### Advanced Configuration
+If you need to override the default `loopback` setting (e.g., remote load balancer), add to your `.env` file:
+
+```env
+TRUST_PROXY=1  # or another value based on your proxy setup
+```
+
+The loader.js respects .env values and only sets the default when TRUST_PROXY is not already defined.
+
+---
+
+## Summary of Changes (November 12, 2025)
+
+This document tracks all modifications made to support the user requirements:
 
 ### 1. ✅ Manual Cleanup Button for Expired Emails
 **Location:** `client/src/pages/dashboard.tsx`

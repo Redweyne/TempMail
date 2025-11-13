@@ -27,5 +27,12 @@ process.env.NODE_ENV = 'production';
 process.env.PORT = '5001';
 process.env.BASE_PATH = '/tempmail';
 
+// Enable trust proxy for VPS deployment behind reverse proxy
+// Use "loopback" to only trust local proxies (nginx on same machine)
+// Can be overridden via .env file if needed (e.g., for remote load balancers)
+if (!process.env.TRUST_PROXY) {
+  process.env.TRUST_PROXY = 'loopback';
+}
+
 // Start the application
 await import('./dist/index.js');
