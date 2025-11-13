@@ -12,6 +12,38 @@ Redweyne is a temporary email service that allows users to create disposable ema
 
 ## Recent Changes
 
+### November 13, 2025 - Nginx Reverse Proxy Configuration Fix
+- **Issue**: After deploying to VPS with trust proxy fix, `redweyne.com/tempmail` still wouldn't load (404 errors)
+- **Root cause**: Nginx `location /tempmail` block missing trailing slashes
+- **The problem**:
+  - Without trailing slash: `location /tempmail` only matches exact path `/tempmail`
+  - Requests to `/tempmail/`, `/tempmail/dashboard`, `/tempmail/api/*` didn't match → 404 errors
+- **The fix**: Updated nginx configuration in `/etc/nginx/sites-available/InboxAI` on VPS:
+  ```nginx
+  # BEFORE (broken):
+  location /tempmail {
+      proxy_pass http://127.0.0.1:5001;
+  
+  # AFTER (working):
+  location /tempmail/ {
+      proxy_pass http://127.0.0.1:5001/tempmail/;
+  ```
+- **Why this works**: 
+  - `location /tempmail/` matches all paths under /tempmail/
+  - `proxy_pass http://127.0.0.1:5001/tempmail/` preserves the full path when forwarding to Express
+- **Deployment steps**:
+  ```bash
+  # On VPS:
+  nano /etc/nginx/sites-available/InboxAI
+  # Add trailing slashes to location and proxy_pass
+  nginx -t
+  systemctl reload nginx
+  ```
+- **Documentation updated**:
+  - `STANDALONE_DEPLOYMENT.md` - Fixed nginx config example with trailing slashes
+  - `NGINX_FIX_GUIDE.md` - Created quick reference guide for this fix
+- **Important**: Nginx config files are system files on VPS, NOT part of the application code. They can't be pushed/pulled via Git - must be edited directly on the server (one-time setup).
+
 ### November 13, 2025 - Trust Proxy Configuration Fix for VPS Deployment
 - **Fixed trust proxy configuration**: Introduced explicit `TRUST_PROXY` environment variable to properly handle deployments behind reverse proxies
 - **VPS deployment fix**: Rate limiting now works correctly on VPS by trusting local reverse proxy (nginx) via `TRUST_PROXY="loopback"`

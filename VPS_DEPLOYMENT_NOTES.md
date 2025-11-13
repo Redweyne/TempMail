@@ -1,6 +1,69 @@
 # VPS Deployment Notes
 
-## 🚨 CRITICAL FIX - November 13, 2025: Trust Proxy Configuration
+## 🚨 CRITICAL FIX #2 - November 13, 2025: Nginx Reverse Proxy Configuration
+
+### Issue
+After deploying with trust proxy fix, `redweyne.com/tempmail` still doesn't load - shows 404 errors.
+
+### Root Cause
+Nginx `location /tempmail` block is missing trailing slashes:
+- `location /tempmail` only matches the EXACT path `/tempmail`
+- Requests to `/tempmail/`, `/tempmail/dashboard`, `/tempmail/api/*` don't match → 404
+
+### Solution
+Add trailing slashes to nginx configuration:
+
+**Edit `/etc/nginx/sites-available/InboxAI` on VPS:**
+
+```nginx
+# BEFORE (broken):
+location /tempmail {
+    proxy_pass http://127.0.0.1:5001;
+    ...
+}
+
+# AFTER (working):
+location /tempmail/ {
+    proxy_pass http://127.0.0.1:5001/tempmail/;
+    ...
+}
+```
+
+### Exact Steps to Fix
+
+```bash
+# 1. Edit nginx config
+nano /etc/nginx/sites-available/InboxAI
+
+# 2. Find the tempmail location block (around line 5)
+# 3. Change line 5: location /tempmail {  →  location /tempmail/ {
+# 4. Change line 6: proxy_pass http://127.0.0.1:5001;  →  proxy_pass http://127.0.0.1:5001/tempmail/;
+# 5. Save: Ctrl+X, Y, Enter
+
+# 6. Test nginx config
+nginx -t
+
+# 7. Reload nginx
+systemctl reload nginx
+
+# 8. Test in browser
+# Visit: https://redweyne.com/tempmail/
+```
+
+### Why This Works
+- `location /tempmail/` with trailing slash matches all paths under `/tempmail/`
+- `proxy_pass http://127.0.0.1:5001/tempmail/` preserves the full path when forwarding to Express
+- Now all routes work: `/tempmail/`, `/tempmail/dashboard`, `/tempmail/api/*`, etc.
+
+### Important Notes
+- **Nginx config is a system file** - lives in `/etc/nginx/` on VPS, NOT in application code
+- Cannot be pushed/pulled via Git - must edit directly on server (one-time setup)
+- See `NGINX_FIX_GUIDE.md` for quick reference
+- See `STANDALONE_DEPLOYMENT.md` for complete nginx configuration example
+
+---
+
+## 🚨 CRITICAL FIX #1 - November 13, 2025: Trust Proxy Configuration
 
 ### Issue
 The previous trust proxy configuration was breaking VPS deployments behind reverse proxies (nginx, caddy, etc.):
