@@ -12,6 +12,20 @@ Redweyne is a temporary email service that allows users to create disposable ema
 
 ## Recent Changes
 
+### November 13, 2025 - CRITICAL FIX: Trust Proxy on Scoped App
+- **Root cause identified**: Trust proxy was set on root Express app but NOT on `scopedApp` where all middleware runs
+- **Symptom**: Application wouldn't load on VPS - rate limiter threw ValidationError about X-Forwarded-For headers
+- **Fix**: Added `scopedApp.set('trust proxy', trustProxyConfig)` right after scopedApp instantiation
+- **Why it happened**: The app architecture mounts all routes/middleware on a scoped Express instance for base path support, but only the root app had trust proxy configured
+- **Deploy to VPS**: 
+  ```bash
+  cd /var/www/tempmail
+  git pull
+  npm run build
+  pm2 restart tempmail
+  ```
+- **Expected result**: Application loads successfully at redweyne.com/tempmail with no ValidationErrors
+
 ### November 13, 2025 - Nginx Reverse Proxy Configuration Fix (CORRECTED)
 - **Issue #1**: `redweyne.com/tempmail` returned 404 errors
   - **Cause**: `location /tempmail` without trailing slash only matched exact path

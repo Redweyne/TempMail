@@ -75,6 +75,11 @@ app.use((req, res, next) => {
   // Create a scoped app that will be mounted under basePath
   const scopedApp = express();
   
+  // Apply trust proxy to scopedApp (where middleware actually runs)
+  if (trustProxyConfig !== false) {
+    scopedApp.set('trust proxy', trustProxyConfig);
+  }
+  
   // Register routes on the scoped app
   await registerRoutes(scopedApp);
 
