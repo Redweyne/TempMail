@@ -202,8 +202,9 @@ server {
     server_name redweyne.com www.redweyne.com;
 
     # NEW: Tempmail application - ADD THIS BLOCK
-    location /tempmail {
-        proxy_pass http://127.0.0.1:5001;
+    # IMPORTANT: Note the trailing slashes - they're required!
+    location /tempmail/ {
+        proxy_pass http://127.0.0.1:5001/tempmail/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -250,8 +251,9 @@ server {
 ```
 
 **What changed:**
-- Added the `/tempmail` location block BEFORE the existing `/` location
-- Used `127.0.0.1:5001` (same format as your existing config)
+- Added the `/tempmail/` location block with TRAILING SLASH (critical!)
+- Changed `proxy_pass` to `http://127.0.0.1:5001/tempmail/` with TRAILING SLASH
+- This ensures nginx properly forwards all paths like /tempmail/, /tempmail/dashboard, /tempmail/api/*
 - Everything else stays exactly the same
 
 **Save:** `Ctrl+X`, `Y`, `Enter`
